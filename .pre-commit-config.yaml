@@ -1,0 +1,37 @@
+repos:
+  - repo: https://github.com/asottile/reorder_python_imports
+    rev: v3.9.0
+    hooks:
+      - id: reorder-python-imports
+        name: Reorder Python imports
+        types: [file, python]
+  - repo: git@gitlab.yiwise.local:agi/cv/black.git
+    rev: stable
+    hooks:
+      - id: black
+        additional_dependencies: ['click==8.0.4']
+        args: [--line-length=120]
+        types: [file, python]
+  # - repo: https://gitlab.inspir.work/mirrors/mirros_pycqa/autoflake.git
+  #   rev: v1.4
+  #   hooks:
+  #     - id: autoflake
+  #       types: [python]
+  #       require_serial: true
+  #       args: ['--in-place', '--remove-all-unused-imports', '--remove-unused-variable']
+  # - repo: https://gitlab.inspir.work/mirrors/mirros_pycqa/flake8.git
+  #   rev: 3.7.9
+  #   hooks:
+  #     - id: flake8
+  #       args: ['--max-line-length=120', '--max-complexity=18', '--select=B,C,E,F,W,T4,B9', '--ignore=E203,E266,E501,E503,W503,F403,E231,B950,C901,B008,B023']
+  #       types: [file, python]
+  #       additional_dependencies: [flake8-bugbear]
+  - repo:  git@gitlab.yiwise.local:agi/cv/pre-commit-hooks.git
+    rev: v2.4.0
+    hooks:
+      - id: check-byte-order-marker
+        types: [file, python]
+      - id: trailing-whitespace
+        types: [file, python]
+      - id: end-of-file-fixer
+        types: [file, python]
