@@ -26,6 +26,7 @@ class HifiFace(nn.Module):
         super(HifiFace, self).__init__()
         self.generator = Generator(identity_extractor_config)
         self.amp = TrainConfig().amp
+        self.lr = TrainConfig().lr
         # 判别器的定义还不对，可能需要对照论文里面的图片进行修改
         self.discriminator = MultiscaleDiscriminator(3)
 
@@ -61,8 +62,8 @@ class HifiFace(nn.Module):
 
             self.dilation_kernel = torch.ones(5, 5)
             # optimizers
-            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=1e-4, betas=[0, 0.999])
-            self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=1e-4, betas=[0, 0.999])
+            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
+            self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
             if self.amp:
                 self.scaler_G = GradScaler()
                 self.scaler_D = GradScaler()

@@ -1,6 +1,8 @@
 import os
 import random
 from pathlib import Path
+from typing import Dict
+from typing import List
 
 import torch
 from loguru import logger
@@ -51,28 +53,42 @@ class TrainDataset(Dataset):
         for img_path in imgs_without_masks:
             self.img_files.remove(img_path)
 
-        self.img_files = list(self.img_files)
+        self.img_files: List[str] = list(self.img_files)
         self.img_files.sort()
 
-        self.mask_files = list(self.mask_files)
+        self.mask_files: List[str] = list(self.mask_files)
         self.mask_files.sort()
 
-        self.length = len(self.img_files)
+        # 把img_files list按照id整理
+        self.img_per_id: Dict[str, List[str]] = {}
+        for idx, img_path in enumerate(self.img_files):
+            id_name = img_path.split("/")[-2]
+            if id_name in self.img_per_id.keys():
+                self.img_per_id[id_name].append(idx)
+            else:
+                self.img_per_id[id_name] = [idx]
+
+        self.id_list: List[str] = list(self.img_per_id.keys())
+
+        # 所有id都遍历一遍，视为一个epoch
+        self.length = len(self.id_list)
+
+        logger.info(f"dataset contains {self.length} ids and {len(self.mask_files)} images")
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, index):
-        length = self.__len__()
-        source_index = index
+        source_id_index = index
+        source_index = random.choice(self.img_per_id[self.id_list[source_id_index]])
         if random.random() < self.same_rate:
-            target_index = source_index
-        else:
-            target_index = random.randrange(length)
-
-        if target_index == source_index:
+            # 在相同id的文件列表中选择
+            target_index = random.choice(self.img_per_id[self.id_list[source_id_index]])
             same = torch.ones(1)
         else:
+            # 在不同id的文件列表中选择
+            target_id_index = random.choice(list(set(range(self.length)) - set([source_id_index])))
+            target_index = random.choice(self.img_per_id[self.id_list[target_id_index]])
             same = torch.zeros(1)
 
         target_img = Image.open(self.img_files[target_index]).convert("RGB")
@@ -89,6 +105,9 @@ class TrainDataset(Dataset):
             "target_image": target_img,
             "target_mask": target_mask,
             "same": same,
+            # "source_img_name": self.img_files[source_index],
+            # "target_img_name": self.img_files[target_index],
+            # "target_mask_name": self.mask_files[target_index],
         }
 
 
@@ -119,3 +138,12 @@ class TrainDatasetDataLoader:
         """Return a batch of data"""
         for data in self.dataloader:
             yield data
+
+
+if __name__ == "__main__":
+    dataloader = TrainDatasetDataLoader()
+    for idx, data in enumerate(dataloader):
+        print(data["source_img_name"])
+        print(data["target_img_name"])
+        print(data["target_mask_name"])
+        print(data["same"])

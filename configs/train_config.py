@@ -10,9 +10,10 @@ from configs.singleton import Singleton
 class TrainConfig:
     img_root: str = "/data/dataset/face_small/"
     mask_root: str = "/data/dataset/face_mask_small"
-    batch_size: int = 8
-    num_threads: int = 16
+    batch_size: int = 12
+    num_threads: int = 24
     same_rate: float = 0.5
+    lr: float = 5e-5
     amp: bool = False
     identity_extractor_config = {
         "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20.pth",
@@ -20,12 +21,12 @@ class TrainConfig:
         "bfm_folder": "/data/useful_ckpt/BFM",
     }
 
-    visualize_interval: int = 1000
-    plot_interval: int = 1000
-    max_epochs: int = 1000
+    visualize_interval: int = 100
+    plot_interval: int = 50
+    max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "baseline"
+    exp_name: str = "baseline_small"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 

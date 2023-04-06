@@ -19,29 +19,34 @@ def train(rank: int):
     visualizer = Visualizer(opt)
 
     total_iter = 0
-    for epoch in range(opt.max_epochs):
-        trained_samples_in_epoch = 0
-        logger.info(f"Epoch {epoch + 1}/{opt.max_epochs} starts")
-        for idx, data in enumerate(dataloader):
+    while True:
+        for data in dataloader:
             source_image = data["source_image"].to(device)
             target_image = data["target_image"].to(device)
             targe_mask = data["target_mask"].to(device)
             same = data["same"].to(device)
             loss_dict, visual_dict = model(source_image, target_image, targe_mask, same)
 
-            trained_samples_in_epoch += opt.batch_size
             total_iter += 1
 
-            if idx % opt.visualize_interval == 0:
-                visualizer.display_current_results(epoch + trained_samples_in_epoch / dataset_length, visual_dict)
+            if total_iter % opt.visualize_interval == 0:
+                visualizer.display_current_results(total_iter, visual_dict)
 
-            if idx % opt.plot_interval == 0:
-                visualizer.plot_current_losses(epoch + trained_samples_in_epoch / dataset_length, loss_dict)
+            if total_iter % opt.plot_interval == 0:
+                visualizer.plot_current_losses(total_iter, loss_dict)
+                logger.info(f"Iter: {total_iter}")
                 for k, v in loss_dict.items():
                     logger.info(f" {k}: {v}")
+                logger.info("=" * 20)
+
             if total_iter % opt.checkpoint_interval == 0:
                 logger.info(f"Saving model at iter {total_iter}")
                 model.save(opt.checkpoint_dir, total_iter)
+
+            if total_iter > opt.max_iters:
+                logger.info(f"Maximum iterations exceeded. Stopping training.")
+                model.save(opt.checkpoint_dir, total_iter)
+                break
 
 
 if __name__ == "__main__":
