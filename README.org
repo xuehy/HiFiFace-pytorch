@@ -1,0 +1,9 @@
+** 启动实验方法
+
+*** 单卡
+1. 修改 ~configs/train_config.py~ 中的 ~use_ddp = False~
+2. ~CUDA_VISIBLE_DEVICES=x python -m entry.train~
+
+*** 多卡
+1. 修改 ~configs/train_config.py~ 中的 ~use_ddp = True~
+2. 以两卡为例: ~CUDA_VISIBLE_DEVICES=x1,x2 torchrun --nnodes=1 --nproc_per_node=2 --rdzv_id=100 --rdzv_backend=c10d --rdzv_endpoint=127.0.0.1:29400 -m entry.train~
