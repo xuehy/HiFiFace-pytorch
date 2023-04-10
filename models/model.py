@@ -100,8 +100,8 @@ class HifiFace:
                 from torch.nn.parallel import DistributedDataParallel as DDP
                 import torch.distributed as dist
 
-                self.generator = DDP(self.generator, device_ids=[device])  # , find_unused_parameters=True)
-                self.discriminator = DDP(self.discriminator, device_ids=[device])  # , find_unused_parameters=True)
+                self.generator = DDP(self.generator, device_ids=[device])
+                self.discriminator = DDP(self.discriminator, device_ids=[device])
 
                 if dist.get_rank() == 0:
                     torch.save(self.generator.state_dict(), "/tmp/generator.pth")
@@ -142,7 +142,7 @@ class HifiFace:
         loss: Dict[torch.Tensor], contain pairs of loss name and loss values
         """
         same = same_id_mask.unsqueeze(-1).unsqueeze(-1)
-        i_r, i_low, m_r, m_low = self.i_r, self.i_low, self.m_r, self.m_low
+        i_r, i_low, m_r, m_low = self.generator(source_img, target_img)
         i_cylce, _, _, _ = self.generator(target_img, i_r)
         d_r = self.discriminator(i_r)
 
@@ -254,9 +254,10 @@ class HifiFace:
 
         Returns:
         --------
-        None
+        i_r: torch.Tensor, swapped result
         """
-        self.i_r, self.i_low, self.m_r, self.m_low = self.generator(source_img, target_img)
+        i_r, _, _, _ = self.generator(source_img, target_img)
+        return i_r
 
     def optimize(
         self,
@@ -280,7 +281,6 @@ class HifiFace:
         Tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         loss_dict, source_img, target_img, m_r(预测的mask), i_r（换脸结果)
         """
-        self.forward(source_img, target_img)
         src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
             source_img, target_img, target_mask, same_id_mask
         )
@@ -341,5 +341,5 @@ if __name__ == "__main__":
         tgt_mask = tgt_mask.repeat(16, 1, 1, 1)
         same_id_mask = same_id_mask.repeat(16, 1)
     while True:
-        x = model(source_img, target_img, tgt_mask, same_id_mask)
+        x = model.optimize(source_img, target_img, tgt_mask, same_id_mask)
         print(x[0]["loss_generator"])
