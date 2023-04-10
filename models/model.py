@@ -9,8 +9,6 @@ import lpips
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.cuda.amp import autocast as autocast
-from torch.cuda.amp import GradScaler
 
 from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
@@ -25,8 +23,8 @@ class HifiFace(nn.Module):
     def __init__(self, identity_extractor_config, is_training=True):
         super(HifiFace, self).__init__()
         self.generator = Generator(identity_extractor_config)
-        self.amp = TrainConfig().amp
         self.lr = TrainConfig().lr
+        self.use_hvd = TrainConfig().use_hvd
         self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
         # 判别器的定义还不对，可能需要对照论文里面的图片进行修改
         self.discriminator = MultiscaleDiscriminator(3)
@@ -65,9 +63,6 @@ class HifiFace(nn.Module):
             # optimizers
             self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
             self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
-            if self.amp:
-                self.scaler_G = GradScaler()
-                self.scaler_D = GradScaler()
 
     def save(self, path, idx=None):
         if idx is None:
@@ -90,6 +85,17 @@ class HifiFace(nn.Module):
             self.dilation_kernel = self.dilation_kernel.to(device)
             self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
             self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
+            if self.use_hvd:
+                import horovod.torch as hvd
+
+                self.g_optimizer = hvd.DistributedOptimizer(
+                    self.g_optimizer, named_parameters=self.generator.named_parameters()
+                )
+                self.d_optimizer = hvd.DistributedOptimizer(
+                    self.d_optimizer, named_parameters=self.discriminator.named_parameters()
+                )
+                hvd.broadcast_parameters(self.generator.state_dict(), root_rank=0)
+                hvd.broadcast_parameters(self.discriminator.state_dict(), root_rank=0)
 
     def train(self):
         self.generator.train()
@@ -100,8 +106,7 @@ class HifiFace(nn.Module):
         self.discriminator.eval()
 
     def inference(self, source_img, target_img):
-        with autocast():
-            i_r, _, _, _ = self.generator(source_img, target_img)
+        i_r, _, _, _ = self.generator(source_img, target_img)
         return i_r
 
     def train_forward_generator(self, source_img, target_img, target_mask, same_id_mask):
@@ -245,36 +250,32 @@ class HifiFace(nn.Module):
         loss_dict, source_img, target_img, m_r(预测的mask), i_r（换脸结果） | i_r
         """
         if self.training:
-            if self.amp:
-                with autocast():
-                    src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
-                        source_img, target_img, target_mask, same_id_mask
-                    )
-            else:
-                src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
-                    source_img, target_img, target_mask, same_id_mask
-                )
+            src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
+                source_img, target_img, target_mask, same_id_mask
+            )
             loss_G = loss_G_dict["loss_generator"]
             self.g_optimizer.zero_grad()
-            if self.amp:
-                self.scaler_G.scale(loss_G).backward()
-                self.scaler_G.step(self.g_optimizer)
-                self.scaler_G.update()
+            loss_G.backward()
+            if self.use_hvd:
+                self.g_optimizer.synchronize()
+            global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
+            if self.use_hvd:
+                with self.g_optimizer.skip_synchronize():
+                    self.g_optimizer.step()
             else:
-                loss_G.backward()
-                global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
                 self.g_optimizer.step()
 
             loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
             loss_D = loss_D_dict["loss_discriminator"]
             self.d_optimizer.zero_grad()
-            if self.amp:
-                self.scaler_D.scale(loss_D).backward()
-                self.scaler_D.step(self.d_optimizer)
-                self.scaler_D.update()
+            loss_D.backward()
+            if self.use_hvd:
+                self.d_optimizer.synchronize()
+            global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
+            if self.use_hvd:
+                with self.d_optimizer.skip_synchronize():
+                    self.d_optimizer.step()
             else:
-                loss_D.backward()
-                global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
                 self.d_optimizer.step()
 
             total_loss_dict = {"global_norm_G": global_norm_G, "global_norm_D": global_norm_D}

@@ -119,13 +119,29 @@ class TrainDatasetDataLoader:
         opt = TrainConfig()
         self.dataset = TrainDataset(opt.img_root, opt.mask_root, opt.same_rate)
         logger.info(f"dataset {type(self.dataset).__name__} created")
-        self.dataloader = torch.utils.data.DataLoader(
-            self.dataset,
-            batch_size=opt.batch_size,
-            shuffle=True,
-            num_workers=int(opt.num_threads),
-            drop_last=True,
-        )
+        if opt.use_hvd:
+            import horovod.torch as hvd
+
+            self.train_sampler = torch.utils.data.distributed.DistributedSampler(
+                self.dataset, num_replicas=hvd.size(), rank=hvd.rank()
+            )
+            self.dataloader = torch.utils.data.DataLoader(
+                self.dataset,
+                batch_size=opt.batch_size,
+                num_workers=int(opt.num_threads),
+                drop_last=True,
+                sampler=self.train_sampler,
+                pin_memory=True,
+            )
+        else:
+            self.dataloader = torch.utils.data.DataLoader(
+                self.dataset,
+                batch_size=opt.batch_size,
+                shuffle=True,
+                num_workers=int(opt.num_threads),
+                drop_last=True,
+                pin_memory=True,
+            )
 
     def load_data(self):
         return self
