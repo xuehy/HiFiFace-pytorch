@@ -12,8 +12,9 @@ class TrainConfig:
     mask_root: str = "/data/dataset/face_mask_small"
     batch_size: int = 12
     num_threads: int = 24
-    same_rate: float = 0.5
-    lr: float = 5e-5
+    same_rate: float = 0.2
+    lr: float = 2e-5
+    grad_clip: float = 0.1
     amp: bool = False
     identity_extractor_config = {
         "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20.pth",
@@ -22,7 +23,7 @@ class TrainConfig:
     }
 
     visualize_interval: int = 100
-    plot_interval: int = 50
+    plot_interval: int = 10
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 

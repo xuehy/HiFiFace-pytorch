@@ -27,6 +27,7 @@ class HifiFace(nn.Module):
         self.generator = Generator(identity_extractor_config)
         self.amp = TrainConfig().amp
         self.lr = TrainConfig().lr
+        self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
         # 判别器的定义还不对，可能需要对照论文里面的图片进行修改
         self.discriminator = MultiscaleDiscriminator(3)
 
@@ -87,8 +88,8 @@ class HifiFace(nn.Module):
             self.loss_fn_vgg.to(device)
             self.face_model.to(device)
             self.dilation_kernel = self.dilation_kernel.to(device)
-            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=1e-4, betas=[0, 0.999])
-            self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=1e-4, betas=[0, 0.999])
+            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
+            self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
 
     def train(self):
         self.generator.train()
@@ -261,6 +262,7 @@ class HifiFace(nn.Module):
                 self.scaler_G.update()
             else:
                 loss_G.backward()
+                global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
                 self.g_optimizer.step()
 
             loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
@@ -272,9 +274,10 @@ class HifiFace(nn.Module):
                 self.scaler_D.update()
             else:
                 loss_D.backward()
+                global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
                 self.d_optimizer.step()
 
-            total_loss_dict = {}
+            total_loss_dict = {"global_norm_G": global_norm_G, "global_norm_D": global_norm_D}
             total_loss_dict.update(loss_G_dict)
             total_loss_dict.update(loss_D_dict)
             return total_loss_dict, {

@@ -16,6 +16,7 @@ def train(rank: int):
 
     model = HifiFace(opt.identity_extractor_config, is_training=True)
     model.to(device)
+    model.train()
     visualizer = Visualizer(opt)
 
     total_iter = 0
@@ -50,4 +51,4 @@ def train(rank: int):
 
 
 if __name__ == "__main__":
-    train(1)
+    train(0)
