@@ -117,6 +117,8 @@ class HifiFace:
     def train(self):
         self.generator.train()
         self.discriminator.train()
+        # 整个id extractor是不训练的模块
+        self.generator.id_extractor.eval()
 
     def eval(self):
         self.generator.eval()
