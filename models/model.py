@@ -146,6 +146,7 @@ class HifiFace:
         same_id_mask: torch.Tensor, [B, 1]
 
         Returns:
+        --------
         source_img: torch.Tensor
         target_img: torch.Tensor
         i_r: torch.Tensor

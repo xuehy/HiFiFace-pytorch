@@ -87,10 +87,14 @@ class Generator(nn.Module):
         -----------
         i_source: torch.Tensor, shape (B, 3, H, W), in range [0, 1], source face image
         i_target: torch.Tensor, shape (B, 3, H, W), in range [0, 1], target face image
+        need_id_grad: bool, whether to calculate id extractor module's gradient
 
         Returns:
         --------
-
+        i_r:    torch.Tensor
+        i_low:  torch.Tensor
+        m_r:    torch.Tensor
+        m_low:  torch.Tensor
         """
         if need_id_grad:
             shape_aware_id_vector = self.id_extractor(i_source, i_target)
