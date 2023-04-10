@@ -62,6 +62,7 @@ class HifiFace:
             self.setup(device)
 
     def save(self, path, idx=None):
+        os.makedirs(path, exist_ok=True)
         if idx is None:
             g_path = os.path.join(path, "generator.pth")
             d_path = os.path.join(path, "discriminator.pth")

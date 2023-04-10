@@ -37,8 +37,6 @@ class TrainConfig:
         time_stamp = int(time.time() * 1000)
         self.log_dir = os.path.join(self.log_basedir, f"{self.exp_name}_{time_stamp}")
         self.checkpoint_dir = os.path.join(self.checkpoint_basedir, f"{self.exp_name}_{time_stamp}")
-        os.makedirs(self.log_dir, exist_ok=True)
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
 
 
 if __name__ == "__main__":
