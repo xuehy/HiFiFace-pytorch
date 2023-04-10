@@ -77,6 +77,7 @@ class Generator(nn.Module):
     def __init__(self, identity_extractor_config):
         super(Generator, self).__init__()
         self.id_extractor = ShapeAwareIdentityExtractor(identity_extractor_config)
+        self.id_extractor.requires_grad_(False)
         self.encoder = Encoder()
         self.decoder = Decoder()
         self.sff_module = SemanticFaceFusionModule()

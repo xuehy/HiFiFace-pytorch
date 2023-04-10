@@ -59,7 +59,7 @@ class HifiFace:
 
             self.dilation_kernel = torch.ones(5, 5)
 
-            self.setup(device)
+        self.setup(device)
 
     def save(self, path, idx=None):
         os.makedirs(path, exist_ok=True)
@@ -111,15 +111,7 @@ class HifiFace:
                 self.generator.load_state_dict(torch.load("/tmp/generator.pth", map_location=device))
                 self.discriminator.load_state_dict(torch.load("/tmp/discriminator.pth", map_location=device))
 
-            # 优化器跳过generator中的shape aware identity extractor
-            g_params_need_optimize = []
-            for name, param in self.generator.named_parameters():
-                if "id_extractor" in name:
-                    continue
-                else:
-                    g_params_need_optimize.append(param)
-
-            self.g_optimizer = torch.optim.AdamW(g_params_need_optimize, lr=self.lr, betas=[0, 0.999])
+            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
             self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
 
     def train(self):
@@ -315,7 +307,7 @@ class HifiFace:
 
         return total_loss_dict, {
             "source face": src_img,
-            "target_face": tgt_img,
+            "target face": tgt_img,
             "swapped face": i_r,
             "pred face mask": m_r,
         }
