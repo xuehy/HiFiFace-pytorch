@@ -4,7 +4,14 @@ import torch.nn as nn
 
 class MultiscaleDiscriminator(nn.Module):
     def __init__(
-        self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False, num_D=3, getIntermFeat=False
+        self,
+        input_nc,
+        ndf=64,
+        n_layers=3,
+        norm_layer=nn.InstanceNorm2d,
+        use_sigmoid=False,
+        num_D=3,
+        getIntermFeat=False,
     ):
         super(MultiscaleDiscriminator, self).__init__()
         self.num_D = num_D

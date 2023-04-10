@@ -119,12 +119,8 @@ class TrainDatasetDataLoader:
         opt = TrainConfig()
         self.dataset = TrainDataset(opt.img_root, opt.mask_root, opt.same_rate)
         logger.info(f"dataset {type(self.dataset).__name__} created")
-        if opt.use_hvd:
-            import horovod.torch as hvd
-
-            self.train_sampler = torch.utils.data.distributed.DistributedSampler(
-                self.dataset, num_replicas=hvd.size(), rank=hvd.rank()
-            )
+        if opt.use_ddp:
+            self.train_sampler = torch.utils.data.distributed.DistributedSampler(self.dataset, shuffle=True)
             self.dataloader = torch.utils.data.DataLoader(
                 self.dataset,
                 batch_size=opt.batch_size,

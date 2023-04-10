@@ -1,8 +1,6 @@
 import os
 from typing import Dict
-from typing import Optional
 from typing import Tuple
-from typing import Union
 
 import kornia
 import lpips
@@ -19,12 +17,12 @@ from models.gan_loss import MultiScaleGANLoss
 from models.generator import Generator
 
 
-class HifiFace(nn.Module):
-    def __init__(self, identity_extractor_config, is_training=True):
+class HifiFace:
+    def __init__(self, identity_extractor_config, is_training=True, device="cpu"):
         super(HifiFace, self).__init__()
         self.generator = Generator(identity_extractor_config)
         self.lr = TrainConfig().lr
-        self.use_hvd = TrainConfig().use_hvd
+        self.use_ddp = TrainConfig().use_ddp
         self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
         # 判别器的定义还不对，可能需要对照论文里面的图片进行修改
         self.discriminator = MultiscaleDiscriminator(3)
@@ -60,9 +58,8 @@ class HifiFace(nn.Module):
             self.lambda_id = 5
 
             self.dilation_kernel = torch.ones(5, 5)
-            # optimizers
-            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
-            self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
+
+            self.setup(device)
 
     def save(self, path, idx=None):
         if idx is None:
@@ -71,31 +68,50 @@ class HifiFace(nn.Module):
         else:
             g_path = os.path.join(path, f"generator_{idx}.pth")
             d_path = os.path.join(path, f"discriminator_{idx}.pth")
-        torch.save(self.generator.state_dict(), g_path)
-        torch.save(self.discriminator.state_dict(), d_path)
+        if self.use_ddp:
+            torch.save(self.generator.module.state_dict(), g_path)
+            torch.save(self.discriminator.module.state_dict(), d_path)
+        else:
+            torch.save(self.generator.state_dict(), g_path)
+            torch.save(self.discriminator.state_dict(), d_path)
 
-    def to(self, device):
+    def load(self, path, idx=None):
+        if idx is None:
+            g_path = os.path.join(path, "generator.pth")
+            d_path = os.path.join(path, "discriminator.pth")
+        else:
+            g_path = os.path.join(path, f"generator_{idx}.pth")
+            d_path = os.path.join(path, f"discriminator_{idx}.pth")
+        self.generator.load_state_dict(torch.load(g_path, map_location="cpu"))
+        self.discriminator.load_state_dict(torch.load(d_path, map_location="cpu"))
+
+    def setup(self, device):
         self.generator.to(device)
         self.discriminator.to(device)
+
         if self.is_training:
             self.f_3d.to(device)
             self.f_id.to(device)
             self.loss_fn_vgg.to(device)
             self.face_model.to(device)
             self.dilation_kernel = self.dilation_kernel.to(device)
+            if self.use_ddp:
+                from torch.nn.parallel import DistributedDataParallel as DDP
+                import torch.distributed as dist
+
+                self.generator = DDP(self.generator, device_ids=[device])  # , find_unused_parameters=True)
+                self.discriminator = DDP(self.discriminator, device_ids=[device])  # , find_unused_parameters=True)
+
+                if dist.get_rank() == 0:
+                    torch.save(self.generator.state_dict(), "/tmp/generator.pth")
+                    torch.save(self.discriminator.state_dict(), "/tmp/discriminator.pth")
+
+                dist.barrier()
+                self.generator.load_state_dict(torch.load("/tmp/generator.pth", map_location=device))
+                self.discriminator.load_state_dict(torch.load("/tmp/discriminator.pth", map_location=device))
+
             self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
             self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
-            if self.use_hvd:
-                import horovod.torch as hvd
-
-                self.g_optimizer = hvd.DistributedOptimizer(
-                    self.g_optimizer, named_parameters=self.generator.named_parameters()
-                )
-                self.d_optimizer = hvd.DistributedOptimizer(
-                    self.d_optimizer, named_parameters=self.discriminator.named_parameters()
-                )
-                hvd.broadcast_parameters(self.generator.state_dict(), root_rank=0)
-                hvd.broadcast_parameters(self.discriminator.state_dict(), root_rank=0)
 
     def train(self):
         self.generator.train()
@@ -104,10 +120,6 @@ class HifiFace(nn.Module):
     def eval(self):
         self.generator.eval()
         self.discriminator.eval()
-
-    def inference(self, source_img, target_img):
-        i_r, _, _, _ = self.generator(source_img, target_img)
-        return i_r
 
     def train_forward_generator(self, source_img, target_img, target_mask, same_id_mask):
         """
@@ -127,7 +139,7 @@ class HifiFace(nn.Module):
         loss: Dict[torch.Tensor], contain pairs of loss name and loss values
         """
         same = same_id_mask.unsqueeze(-1).unsqueeze(-1)
-        i_r, i_low, m_r, m_low = self.generator(source_img, target_img)
+        i_r, i_low, m_r, m_low = self.i_r, self.i_low, self.m_r, self.m_low
         i_cylce, _, _, _ = self.generator(target_img, i_r)
         d_r = self.discriminator(i_r)
 
@@ -230,65 +242,68 @@ class HifiFace(nn.Module):
         self,
         source_img: torch.Tensor,
         target_img: torch.Tensor,
-        target_mask: Optional[torch.Tensor] = None,
-        same_id_mask: Optional[torch.Tensor] = None,
-    ) -> Union[Tuple[Dict, Dict[str, torch.Tensor]], torch.Tensor]:
+    ) -> torch.Tensor:
         """
-        模型的forward
-        训练模式下执行一次训练，并返回loss信息和结果
-        推理模式下，直接执行换脸操作，并返回结果
         Parameters:
         -----------
         source_img: torch.Tensor, source face 图像
         target_img: torch.Tensor, target face 图像
-        target_mask: Optional[torch.Tensor], target face mask, 训练时需要
-        same_id_mask: Optional[torch.Tensor], same id mask, 标识source 和 target是否是同个人，训练时需要
 
         Returns:
         --------
-        Union[Tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-        loss_dict, source_img, target_img, m_r(预测的mask), i_r（换脸结果） | i_r
+        None
         """
-        if self.training:
-            src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
-                source_img, target_img, target_mask, same_id_mask
-            )
-            loss_G = loss_G_dict["loss_generator"]
-            self.g_optimizer.zero_grad()
-            loss_G.backward()
-            if self.use_hvd:
-                self.g_optimizer.synchronize()
-            global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
-            if self.use_hvd:
-                with self.g_optimizer.skip_synchronize():
-                    self.g_optimizer.step()
-            else:
-                self.g_optimizer.step()
+        self.i_r, self.i_low, self.m_r, self.m_low = self.generator(source_img, target_img)
 
-            loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
-            loss_D = loss_D_dict["loss_discriminator"]
-            self.d_optimizer.zero_grad()
-            loss_D.backward()
-            if self.use_hvd:
-                self.d_optimizer.synchronize()
-            global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
-            if self.use_hvd:
-                with self.d_optimizer.skip_synchronize():
-                    self.d_optimizer.step()
-            else:
-                self.d_optimizer.step()
+    def optimize(
+        self,
+        source_img: torch.Tensor,
+        target_img: torch.Tensor,
+        target_mask: torch.Tensor,
+        same_id_mask: torch.Tensor,
+    ) -> Tuple[Dict, Dict[str, torch.Tensor]]:
+        """
+        模型的optimize
+        训练模式下执行一次训练，并返回loss信息和结果
+        Parameters:
+        -----------
+        source_img: torch.Tensor, source face 图像
+        target_img: torch.Tensor, target face 图像
+        target_mask: torch.Tensor, target face mask
+        same_id_mask: torch.Tensor, same id mask, 标识source 和 target是否是同个人
 
-            total_loss_dict = {"global_norm_G": global_norm_G, "global_norm_D": global_norm_D}
-            total_loss_dict.update(loss_G_dict)
-            total_loss_dict.update(loss_D_dict)
-            return total_loss_dict, {
-                "source face": src_img,
-                "target_face": tgt_img,
-                "swapped face": i_r,
-                "pred face mask": m_r,
-            }
-        else:
-            return self.inference(source_img, target_img)
+        Returns:
+        --------
+        Tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        loss_dict, source_img, target_img, m_r(预测的mask), i_r（换脸结果)
+        """
+        self.forward(source_img, target_img)
+        src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
+            source_img, target_img, target_mask, same_id_mask
+        )
+        loss_G = loss_G_dict["loss_generator"]
+        self.g_optimizer.zero_grad()
+        loss_G.backward()
+        global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
+        self.g_optimizer.step()
+
+        loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
+        loss_D = loss_D_dict["loss_discriminator"]
+        self.d_optimizer.zero_grad()
+        loss_D.backward()
+        global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
+        self.d_optimizer.step()
+
+        total_loss_dict = {"global_norm_G": global_norm_G, "global_norm_D": global_norm_D}
+        total_loss_dict.update(loss_G_dict)
+        total_loss_dict.update(loss_D_dict)
+
+        return total_loss_dict, {
+            "source face": src_img,
+            "target_face": tgt_img,
+            "swapped face": i_r,
+            "pred face mask": m_r,
+        }
 
 
 if __name__ == "__main__":

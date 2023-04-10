@@ -36,9 +36,7 @@ class MaskDataset(Dataset):
 class MaskDataLoader:
     def __init__(self):
         """Initialize this class"""
-        self.dataset = MaskDataset(
-            img_root="/home/xuehy/workspace/HiFiFace/test", mask_root="/home/xuehy/workspace/HiFiFace/mask"
-        )
+        self.dataset = MaskDataset(img_root="/data/dataset/face_1k/alignHQ", mask_root="/data/dataset/face_1k/mask")
 
         self.dataloader = torch.utils.data.DataLoader(
             self.dataset, batch_size=8, shuffle=True, num_workers=8, drop_last=False
@@ -46,7 +44,7 @@ class MaskDataLoader:
 
     def __len__(self):
         """Return the number of data in the dataset"""
-        return len(self.dataset)
+        return len(self.dataset) / 8
 
     def __iter__(self):
         """Return a batch of data"""
@@ -56,16 +54,17 @@ class MaskDataLoader:
 
 if __name__ == "__main__":
     dataloader = MaskDataLoader()
-    bisenet_path = "/home/xuehy/useful_ckpt/face_parsing/parsing_model_79999_iter.pth"
+    bisenet_path = "/data/useful_ckpt/face_parsing/parsing_model_79999_iter.pth"
     bisenet = BiSeNet(n_classes=19)
-
-    state_dict = torch.load(bisenet_path, map_location="cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    bisenet.to(device)
+    state_dict = torch.load(bisenet_path, map_location=device)
     bisenet.load_state_dict(state_dict)
     bisenet.eval()
 
     for data in tqdm(dataloader):
-        mask, ignore_ids = bisenet.get_mask(data["img"], 256)
-        mask = (mask * 255).to(torch.uint8).numpy().transpose(0, 2, 3, 1).repeat(3, 3)
+        mask, ignore_ids = bisenet.get_mask(data["img"].to(device), 256)
+        mask = (mask * 255).to(torch.uint8).cpu().numpy().transpose(0, 2, 3, 1).repeat(3, 3)
 
         for i in range(mask.shape[0]):
             if ignore_ids[i]:

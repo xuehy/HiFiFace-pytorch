@@ -8,16 +8,15 @@ from configs.singleton import Singleton
 @Singleton
 @dataclass
 class TrainConfig:
-    img_root: str = "/data/dataset/face_small/"
-    mask_root: str = "/data/dataset/face_mask_small"
+    img_root: str = "/data/dataset/face_1k/alignHQ"
+    mask_root: str = "/data/dataset/face_1k/mask"
     batch_size: int = 12
-    num_threads: int = 24
+    num_threads: int = 12
     same_rate: float = 0.2
     lr: float = 2e-5
-    grad_clip: float = 0.1
-    amp: bool = False
+    grad_clip: float = 100.0
 
-    use_hvd: bool = True
+    use_ddp: bool = True
 
     identity_extractor_config = {
         "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20.pth",
@@ -26,11 +25,11 @@ class TrainConfig:
     }
 
     visualize_interval: int = 100
-    plot_interval: int = 10
+    plot_interval: int = 100
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "baseline_small"
+    exp_name: str = "baseline_1k_ddp"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 

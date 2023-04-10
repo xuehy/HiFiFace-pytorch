@@ -33,6 +33,9 @@ class ShapeAwareIdentityExtractor(nn.Module):
         self.f_id.load_state_dict(torch.load(f_id_checkpoint_path, map_location="cpu"))
         self.f_id.eval()
 
+        self.f_3d.requires_grad_(False)
+        self.f_id.requires_grad_(False)
+
     @torch.no_grad()
     def forward(self, i_source, i_target):
         """
