@@ -10,7 +10,7 @@ from configs.singleton import Singleton
 class TrainConfig:
     img_root: str = "/data/dataset/face_1k/alignHQ"
     mask_root: str = "/data/dataset/face_1k/mask"
-    batch_size: int = 12
+    batch_size: int = 8
     num_threads: int = 12
     same_rate: float = 0.2
     lr: float = 2e-5
@@ -29,7 +29,7 @@ class TrainConfig:
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "baseline_1k_ddp"
+    exp_name: str = "baseline_1k_ddp_with_cyc"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 

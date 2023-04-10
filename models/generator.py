@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from models.model_blocks import AdaInResBlock
@@ -80,7 +81,7 @@ class Generator(nn.Module):
         self.decoder = Decoder()
         self.sff_module = SemanticFaceFusionModule()
 
-    def forward(self, i_source, i_target):
+    def forward(self, i_source, i_target, need_id_grad=False):
         """
         Parameters:
         -----------
@@ -91,7 +92,11 @@ class Generator(nn.Module):
         --------
 
         """
-        shape_aware_id_vector = self.id_extractor(i_source, i_target)
+        if need_id_grad:
+            shape_aware_id_vector = self.id_extractor(i_source, i_target)
+        else:
+            with torch.no_grad():
+                shape_aware_id_vector = self.id_extractor(i_source, i_target)
         z_enc, x = self.encoder(i_target)
         z_dec = self.decoder(x, shape_aware_id_vector)
 

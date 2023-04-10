@@ -111,14 +111,25 @@ class HifiFace:
                 self.generator.load_state_dict(torch.load("/tmp/generator.pth", map_location=device))
                 self.discriminator.load_state_dict(torch.load("/tmp/discriminator.pth", map_location=device))
 
-            self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
+            # 优化器跳过generator中的shape aware identity extractor
+            g_params_need_optimize = []
+            for name, param in self.generator.named_parameters():
+                if "id_extractor" in name:
+                    continue
+                else:
+                    g_params_need_optimize.append(param)
+
+            self.g_optimizer = torch.optim.AdamW(g_params_need_optimize, lr=self.lr, betas=[0, 0.999])
             self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
 
     def train(self):
         self.generator.train()
         self.discriminator.train()
         # 整个id extractor是不训练的模块
-        self.generator.id_extractor.eval()
+        if self.use_ddp:
+            self.generator.module.id_extractor.eval()
+        else:
+            self.generator.id_extractor.eval()
 
     def eval(self):
         self.generator.eval()
@@ -142,8 +153,8 @@ class HifiFace:
         loss: Dict[torch.Tensor], contain pairs of loss name and loss values
         """
         same = same_id_mask.unsqueeze(-1).unsqueeze(-1)
-        i_r, i_low, m_r, m_low = self.generator(source_img, target_img)
-        i_cylce, _, _, _ = self.generator(target_img, i_r)
+        i_r, i_low, m_r, m_low = self.generator(source_img, target_img, need_id_grad=False)
+        i_cylce, _, _, _ = self.generator(target_img, i_r, need_id_grad=True)
         d_r = self.discriminator(i_r)
 
         # SID Loss: shape loss + id loss
@@ -318,28 +329,28 @@ if __name__ == "__main__":
 
     model = HifiFace(identity_extractor_config, is_training=True)
 
-    src = cv2.imread("/home/xuehongyang/data/test1.jpg")
-    tgt = cv2.imread("/home/xuehongyang/data/test2.jpg")
-    src = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
-    tgt = cv2.cvtColor(tgt, cv2.COLOR_BGR2RGB)
-    src = cv2.resize(src, (256, 256))
-    tgt = cv2.resize(tgt, (256, 256))
-    src = src.transpose(2, 0, 1)[None, ...]
-    tgt = tgt.transpose(2, 0, 1)[None, ...]
-    source_img = torch.from_numpy(src).float() / 255.0
-    target_img = torch.from_numpy(tgt).float() / 255.0
-    same_id_mask = torch.Tensor([1]).unsqueeze(0)
-    tgt_mask = target_img[:, 0, :, :].unsqueeze(1)
-    if torch.cuda.is_available():
-        model.to("cuda:3")
-        source_img = source_img.to("cuda:3")
-        target_img = target_img.to("cuda:3")
-        tgt_mask = tgt_mask.to("cuda:3")
-        same_id_mask = same_id_mask.to("cuda:3")
-        source_img = source_img.repeat(16, 1, 1, 1)
-        target_img = target_img.repeat(16, 1, 1, 1)
-        tgt_mask = tgt_mask.repeat(16, 1, 1, 1)
-        same_id_mask = same_id_mask.repeat(16, 1)
-    while True:
-        x = model.optimize(source_img, target_img, tgt_mask, same_id_mask)
-        print(x[0]["loss_generator"])
+    # src = cv2.imread("/home/xuehongyang/data/test1.jpg")
+    # tgt = cv2.imread("/home/xuehongyang/data/test2.jpg")
+    # src = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
+    # tgt = cv2.cvtColor(tgt, cv2.COLOR_BGR2RGB)
+    # src = cv2.resize(src, (256, 256))
+    # tgt = cv2.resize(tgt, (256, 256))
+    # src = src.transpose(2, 0, 1)[None, ...]
+    # tgt = tgt.transpose(2, 0, 1)[None, ...]
+    # source_img = torch.from_numpy(src).float() / 255.0
+    # target_img = torch.from_numpy(tgt).float() / 255.0
+    # same_id_mask = torch.Tensor([1]).unsqueeze(0)
+    # tgt_mask = target_img[:, 0, :, :].unsqueeze(1)
+    # if torch.cuda.is_available():
+    #     model.to("cuda:3")
+    #     source_img = source_img.to("cuda:3")
+    #     target_img = target_img.to("cuda:3")
+    #     tgt_mask = tgt_mask.to("cuda:3")
+    #     same_id_mask = same_id_mask.to("cuda:3")
+    #     source_img = source_img.repeat(16, 1, 1, 1)
+    #     target_img = target_img.repeat(16, 1, 1, 1)
+    #     tgt_mask = tgt_mask.repeat(16, 1, 1, 1)
+    #     same_id_mask = same_id_mask.repeat(16, 1)
+    # while True:
+    #     x = model.optimize(source_img, target_img, tgt_mask, same_id_mask)
+    #     print(x[0]["loss_generator"])
