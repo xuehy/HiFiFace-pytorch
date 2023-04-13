@@ -10,7 +10,7 @@ from configs.singleton import Singleton
 @dataclass
 class TrainConfig:
     mode = FaceSwapMode.MANY_TO_MANY
-    target_name: str = ""
+    source_name: str = ""
 
     img_root: str = "/data/dataset/face_1k/alignHQ"
     mask_root: str = "/data/dataset/face_1k/mask"

@@ -112,18 +112,18 @@ class ManyToManyTrainDataset(Dataset):
         }
 
 
-class ManyToOneTrainDataset(Dataset):
-    def __init__(self, img_root: str, mask_root: str, target_name: str, same_rate=0.5):
+class OneToManyTrainDataset(Dataset):
+    def __init__(self, img_root: str, mask_root: str, source_name: str, same_rate=0.5):
         """
-        Many-to-one 训练数据集构建
+        One-to-many 训练数据集构建
         Parameters:
         -----------
         img_root: str, 人脸图片的根目录
         mask_root: str, 人脸图片mask的根目录
-        target_name: str, 目标脸id的名称, many-to-one里面的one
+        source_name: str, source face id的名称, one-to-many里面的one
         same_rate: float, 每个batch里面相同人脸所占的比例
         """
-        super(ManyToOneTrainDataset, self).__init__()
+        super(OneToManyTrainDataset, self).__init__()
         self.transform = transforms.Compose(
             [
                 transforms.Resize((256, 256)),
@@ -134,7 +134,7 @@ class ManyToOneTrainDataset(Dataset):
         self.img_root = img_root
         self.mask_root = mask_root
         self.same_rate = same_rate
-        self.target_name = target_name
+        self.source_name = source_name
 
         self.mask_files = []
 
@@ -172,9 +172,9 @@ class ManyToOneTrainDataset(Dataset):
         self.id_list: List[str] = list(self.img_per_id.keys())
 
         try:
-            self.target_id_index: int = self.id_list.index(self.target_name)
+            self.source_id_index: int = self.id_list.index(self.source_name)
         except Exception:
-            raise Exception(f"{self.target_name} not in dataset dir")
+            raise Exception(f"{self.source_name} not in dataset dir")
 
         # 所有id都遍历一遍，视为一个epoch
         self.length = len(self.id_list)
@@ -185,17 +185,17 @@ class ManyToOneTrainDataset(Dataset):
         return self.length
 
     def __getitem__(self, index):
-        source_id_index = index
-        source_index = random.choice(self.img_per_id[self.id_list[source_id_index]])
+        target_id_index = index
+        target_index = random.choice(self.img_per_id[self.id_list[target_id_index]])
         if random.random() < self.same_rate:
             # 在相同id的文件列表中选择
-            target_index = random.choice(self.img_per_id[self.id_list[source_id_index]])
+            source_index = random.choice(self.img_per_id[self.id_list[target_id_index]])
             same = torch.ones(1)
         else:
-            # 直接选择target name中的图片
-            target_index = random.choice(self.img_per_id[self.target_name])
-            # 如果和source同个id
-            if source_id_index == self.target_id_index:
+            # 直接选择source name中的图片
+            source_index = random.choice(self.img_per_id[self.source_name])
+            # 如果和target同个id
+            if self.source_id_index == target_id_index:
                 same = torch.ones(1)
             else:
                 same = torch.zeros(1)
@@ -229,8 +229,8 @@ class TrainDatasetDataLoader:
         if opt.mode is FaceSwapMode.MANY_TO_MANY:
             self.dataset = ManyToManyTrainDataset(opt.img_root, opt.mask_root, opt.same_rate)
         elif opt.mode is FaceSwapMode.MANY_TO_ONE:
-            logger.info(f"In many-to-one mode, target face is {opt.target_name}")
-            self.dataset = ManyToOneTrainDataset(opt.img_root, opt.mask_root, opt.target_name, opt.same_rate)
+            logger.info(f"In one-to-many mode, source face is {opt.source_name}")
+            self.dataset = OneToManyTrainDataset(opt.img_root, opt.mask_root, opt.source_name, opt.same_rate)
         else:
             raise NotImplementedError
         logger.info(f"dataset {type(self.dataset).__name__} created")
