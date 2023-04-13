@@ -1,5 +1,6 @@
 import os
 from typing import Dict
+from typing import Optional
 from typing import Tuple
 
 import kornia
@@ -7,6 +8,7 @@ import lpips
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from loguru import logger
 
 from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
@@ -18,7 +20,13 @@ from models.generator import Generator
 
 
 class HifiFace:
-    def __init__(self, identity_extractor_config, is_training=True, device="cpu"):
+    def __init__(
+        self,
+        identity_extractor_config,
+        is_training=True,
+        device="cpu",
+        load_checkpoint: Optional[Tuple[str, int]] = None,
+    ):
         super(HifiFace, self).__init__()
         self.generator = Generator(identity_extractor_config)
         self.lr = TrainConfig().lr
@@ -59,6 +67,9 @@ class HifiFace:
 
             self.dilation_kernel = torch.ones(5, 5)
 
+        if load_checkpoint is not None:
+            self.load(load_checkpoint[0], load_checkpoint[1])
+
         self.setup(device)
 
     def save(self, path, idx=None):
@@ -83,6 +94,7 @@ class HifiFace:
         else:
             g_path = os.path.join(path, f"generator_{idx}.pth")
             d_path = os.path.join(path, f"discriminator_{idx}.pth")
+        logger.info(f"Loading generator from {g_path}")
         self.generator.load_state_dict(torch.load(g_path, map_location="cpu"))
         self.discriminator.load_state_dict(torch.load(d_path, map_location="cpu"))
 
