@@ -2,12 +2,16 @@ import os
 import time
 from dataclasses import dataclass
 
+from configs.mode import FaceSwapMode
 from configs.singleton import Singleton
 
 
 @Singleton
 @dataclass
 class TrainConfig:
+    mode = FaceSwapMode.MANY_TO_MANY
+    target_name: str = ""
+
     img_root: str = "/data/dataset/face_1k/alignHQ"
     mask_root: str = "/data/dataset/face_1k/mask"
     batch_size: int = 8
