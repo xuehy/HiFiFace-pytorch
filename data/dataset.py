@@ -228,7 +228,7 @@ class TrainDatasetDataLoader:
         opt = TrainConfig()
         if opt.mode is FaceSwapMode.MANY_TO_MANY:
             self.dataset = ManyToManyTrainDataset(opt.img_root, opt.mask_root, opt.same_rate)
-        elif opt.mode is FaceSwapMode.MANY_TO_ONE:
+        elif opt.mode is FaceSwapMode.ONE_TO_MANY:
             logger.info(f"In one-to-many mode, source face is {opt.source_name}")
             self.dataset = OneToManyTrainDataset(opt.img_root, opt.mask_root, opt.source_name, opt.same_rate)
         else:
