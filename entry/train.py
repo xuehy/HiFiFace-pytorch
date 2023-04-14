@@ -36,7 +36,9 @@ def train():
     dataset_length = len(dataloader)
     logger.info(f"Dataset length: {dataset_length}")
 
-    model = HifiFace(opt.identity_extractor_config, is_training=True, device=device)
+    model = HifiFace(
+        opt.identity_extractor_config, is_training=True, device=device, load_checkpoint=opt.load_checkpoint
+    )
     model.train()
 
     logger.info("model initialized")

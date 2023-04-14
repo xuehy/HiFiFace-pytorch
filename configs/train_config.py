@@ -22,6 +22,8 @@ class TrainConfig:
 
     use_ddp: bool = True
 
+    load_checkpoint = None
+
     identity_extractor_config = {
         "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20.pth",
         "f_id_checkpoint_path": "/data/useful_ckpt/arcface/ms1mv3_arcface_r100_fp16_backbone.pth",
