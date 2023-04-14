@@ -110,6 +110,5 @@ class UpSamplingBlock(nn.Module):
     def forward(self, x):
         x = self.net(x)
         m_r, i_r = x[:, 0, ...].unsqueeze(1), x[:, 1:, ...]
-        m_r = m_r.float()
         m_r = F.sigmoid(m_r)
         return i_r, m_r

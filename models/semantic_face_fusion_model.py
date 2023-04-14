@@ -40,7 +40,6 @@ class SemanticFaceFusionModule(nn.Module):
         # 估算z_dec对应的人脸 low-level feature mask
         m_low = self.low_mask_predict(z_dec)
 
-        m_low = m_low.float()
         m_low = F.sigmoid(m_low)
         # 计算融合的low-level feature map
         # mask区域使用decoder的low-level特征 + 非mask区域使用encoder的low-level特征

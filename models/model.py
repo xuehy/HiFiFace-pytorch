@@ -320,7 +320,7 @@ class HifiFace:
         return total_loss_dict, {
             "source face": src_img,
             "target face": tgt_img,
-            "swapped face": i_r,
+            "swapped face": torch.clamp(i_r, min=0.0, max=1.0),
             "pred face mask": m_r,
         }
 

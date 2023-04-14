@@ -12,12 +12,12 @@ class TrainConfig:
     mode = FaceSwapMode.MANY_TO_MANY
     source_name: str = ""
 
-    img_root: str = "/data/dataset/face_1k/alignHQ"
-    mask_root: str = "/data/dataset/face_1k/mask"
+    img_root: str = "/data/dataset/faceswap_big_data/vggHQ_train/alignHQ"
+    mask_root: str = "/data/dataset/faceswap_big_data/vggHQ_train/mask"
     batch_size: int = 8
-    num_threads: int = 12
-    same_rate: float = 0.2
-    lr: float = 2e-5
+    num_threads: int = 8
+    same_rate: float = 0.4
+    lr: float = 5e-5
     grad_clip: float = 100.0
 
     use_ddp: bool = True
@@ -35,7 +35,7 @@ class TrainConfig:
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "baseline_1k_ddp_with_cyc"
+    exp_name: str = "baseline_vgg"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 
