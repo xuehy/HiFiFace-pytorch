@@ -159,7 +159,7 @@ class HifiFace:
         """
         same = same_id_mask.unsqueeze(-1).unsqueeze(-1)
         i_r, i_low, m_r, m_low = self.generator(source_img, target_img, need_id_grad=False)
-        i_cylce, _, _, _ = self.generator(target_img, i_r, need_id_grad=True)
+        i_cycle, _, _, _ = self.generator(target_img, i_r, need_id_grad=True)
         d_r = self.discriminator(i_r)
 
         # SID Loss: shape loss + id loss
@@ -176,11 +176,11 @@ class HifiFace:
         _, _, _, q_low = self.face_model.compute_for_render(c_low)
         with torch.no_grad():
             v_id_i_s = F.normalize(
-                self.f_id(F.interpolate((source_img - 0.5) / 0.5, size=112, mode="bilinear")), dim=-1, p=2
+                self.f_id(F.interpolate((source_img - 0.5) / 0.5, size=112, mode="bicubic")), dim=-1, p=2
             )
 
-        v_id_i_r = F.normalize(self.f_id(F.interpolate((i_r - 0.5) / 0.5, size=112, mode="bilinear")), dim=-1, p=2)
-        v_id_i_low = F.normalize(self.f_id(F.interpolate((i_low - 0.5) / 0.5, size=112, mode="bilinear")), dim=-1, p=2)
+        v_id_i_r = F.normalize(self.f_id(F.interpolate((i_r - 0.5) / 0.5, size=112, mode="bicubic")), dim=-1, p=2)
+        v_id_i_low = F.normalize(self.f_id(F.interpolate((i_low - 0.5) / 0.5, size=112, mode="bicubic")), dim=-1, p=2)
         loss_shape = self.l1_loss(q_fuse, q_r) + self.l1_loss(q_fuse, q_low)
         loss_shape = torch.clamp(loss_shape, min=0.0, max=10.0)
 
@@ -193,7 +193,7 @@ class HifiFace:
 
         # Realism Loss: segmentation loss + reconstruction loss + cycle loss + perceptual loss + adversarial loss
 
-        loss_cycle = self.l1_loss(target_img, i_cylce)
+        loss_cycle = self.l1_loss(target_img, i_cycle)
 
         # dilate target mask
         target_mask = kornia.morphology.dilation(target_mask, self.dilation_kernel)
@@ -222,6 +222,7 @@ class HifiFace:
         return (
             source_img,
             target_img,
+            i_cycle.detach(),
             i_r.detach(),
             m_r.detach(),
             {
@@ -297,7 +298,7 @@ class HifiFace:
         Tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         loss_dict, source_img, target_img, m_r(预测的mask), i_r（换脸结果)
         """
-        src_img, tgt_img, i_r, m_r, loss_G_dict = self.train_forward_generator(
+        src_img, tgt_img, i_cycle, i_r, m_r, loss_G_dict = self.train_forward_generator(
             source_img, target_img, target_mask, same_id_mask
         )
         loss_G = loss_G_dict["loss_generator"]
@@ -322,6 +323,7 @@ class HifiFace:
             "target face": tgt_img,
             "swapped face": torch.clamp(i_r, min=0.0, max=1.0),
             "pred face mask": m_r,
+            "cycle face": i_cycle,
         }
 
 
