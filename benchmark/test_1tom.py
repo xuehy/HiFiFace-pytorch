@@ -1,3 +1,4 @@
+import argparse
 import os
 from typing import List
 from typing import Optional
@@ -60,10 +61,19 @@ def test(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="benchmark", description="What the program does", epilog="Text at the bottom of help"
+    )
+    parser.add_argument("-m", "--model_name")
+    parser.add_argument("-i", "--model_index")
+    parser.add_argument("-s", "--source_image")
+    args = parser.parse_args()
     data_root = "/home/xuehongyang/data/face_swap_test"
 
-    model_path = "/data/checkpoints/hififace/baseline_1k_ddp_with_cyc_1681278017147"
-    model_idx = 520000
+    model_path = os.path.join("/data/checkpoints/hififace/", args.model_name)
+    model_idx = int(args.model_index)
+
+    name = f"{args.model_name}_{args.model_index}"
 
     target = [
         "male_1.jpg",
@@ -92,6 +102,6 @@ if __name__ == "__main__":
         "xulie_2.jpg",
     ]
 
-    source = ["gaoyuanyuan.jpg"] * len(target)
-    target_src = os.path.join(data_root, "../result_1tom.jpg")
+    source = [args.source_image] * len(target)
+    target_src = os.path.join(data_root, f"../{name}_1tom_{args.source_image}.jpg")
     test(data_root, target_src, source, target, model_path, model_idx)
