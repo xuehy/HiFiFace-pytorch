@@ -40,7 +40,7 @@ class HifiFace:
         if self.is_training:
             self.l1_loss = nn.L1Loss()
             self.loss_fn_vgg = lpips.LPIPS(net="vgg")
-            self.adv_loss = MultiScaleGANLoss()
+            self.adv_loss = MultiScaleGANLoss(gan_mode="original")
 
             # 3D人脸重建模型
             self.f_3d = ReconNetWrapper(net_recon="resnet50", use_last_fc=False)
@@ -153,6 +153,7 @@ class HifiFace:
         --------
         source_img: torch.Tensor
         target_img: torch.Tensor
+        i_cycle: torch.Tensor, cycle image
         i_r: torch.Tensor
         m_r: torch.Tensor
         loss: Dict[torch.Tensor], contain pairs of loss name and loss values

@@ -17,7 +17,7 @@ class TrainConfig:
     batch_size: int = 8
     num_threads: int = 8
     same_rate: float = 0.4
-    lr: float = 5e-5
+    lr: float = 2e-5
     grad_clip: float = 100.0
 
     use_ddp: bool = True
