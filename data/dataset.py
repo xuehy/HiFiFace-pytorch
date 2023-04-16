@@ -1,4 +1,5 @@
 import os
+import pickle
 import random
 from pathlib import Path
 from typing import Dict
@@ -15,13 +16,13 @@ from configs.train_config import TrainConfig
 
 
 class ManyToManyTrainDataset(Dataset):
-    def __init__(self, img_root: str, mask_root: str, same_rate=0.5):
+    def __init__(self, dataset_root: str, dataset_index: str, same_rate=0.5):
         """
         Many-to-many 训练数据集构建
         Parameters:
         -----------
-        img_root: str, 人脸图片的根目录
-        mask_root: str, 人脸图片mask的根目录
+        dataset_root: str, 数据集根目录
+        dataset_index: str, 数据集index文件路径
         same_rate: float, 每个batch里面相同人脸所占的比例
         """
         super(ManyToManyTrainDataset, self).__init__()
@@ -32,70 +33,43 @@ class ManyToManyTrainDataset(Dataset):
                 transforms.ToTensor(),
             ]
         )
-        self.img_root = img_root
-        self.mask_root = mask_root
+        self.data_root = Path(dataset_root)
+        with open(dataset_index, "rb") as f:
+            self.file_index = pickle.load(f, encoding="bytes")
+
         self.same_rate = same_rate
 
-        self.mask_files = []
-
-        img_dir = Path(img_root)
-        self.img_files = set([str(x) for x in img_dir.glob(f"**/*.jpg")])
-
-        mask_dir = Path(mask_root)
-        self.mask_files = set([str(x) for x in mask_dir.glob(f"**/*.jpg")])
-
-        # 移除没有对应mask的图片
-        imgs_without_masks = []
-        for img_path in self.img_files:
-            base_img_path = "/".join(img_path.split("/")[-2:])
-            mask_path = os.path.join(mask_root, base_img_path)
-            if mask_path not in self.mask_files:
-                imgs_without_masks.append(img_path)
-        for img_path in imgs_without_masks:
-            self.img_files.remove(img_path)
-
-        self.img_files: List[str] = list(self.img_files)
-        self.img_files.sort()
-
-        self.mask_files: List[str] = list(self.mask_files)
-        self.mask_files.sort()
-
-        # 把img_files list按照id整理
-        self.img_per_id: Dict[str, List[str]] = {}
-        for idx, img_path in enumerate(self.img_files):
-            id_name = img_path.split("/")[-2]
-            if id_name in self.img_per_id.keys():
-                self.img_per_id[id_name].append(idx)
-            else:
-                self.img_per_id[id_name] = [idx]
-
-        self.id_list: List[str] = list(self.img_per_id.keys())
+        self.id_list: List[str] = list(self.file_index.keys())
 
         # 所有id都遍历一遍，视为一个epoch
         self.length = len(self.id_list)
-
-        logger.info(f"dataset contains {self.length} ids and {len(self.mask_files)} images")
+        self.image_num = sum([len(v) for v in self.file_index.values()])
+        logger.info(f"dataset contains {self.length} ids and {self.image_num} images")
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, index):
         source_id_index = index
-        source_index = random.choice(self.img_per_id[self.id_list[source_id_index]])
+        source_file = random.choice(self.file_index[self.id_list[source_id_index]])
         if random.random() < self.same_rate:
             # 在相同id的文件列表中选择
-            target_index = random.choice(self.img_per_id[self.id_list[source_id_index]])
+            target_file = random.choice(self.file_index[self.id_list[source_id_index]])
             same = torch.ones(1)
         else:
             # 在不同id的文件列表中选择
             target_id_index = random.choice(list(set(range(self.length)) - set([source_id_index])))
-            target_index = random.choice(self.img_per_id[self.id_list[target_id_index]])
+            target_file = random.choice(self.file_index[self.id_list[target_id_index]])
             same = torch.zeros(1)
 
-        target_img = Image.open(self.img_files[target_index]).convert("RGB")
-        source_img = Image.open(self.img_files[source_index]).convert("RGB")
+        source_file = self.data_root / Path(source_file)
+        target_file = self.data_root / Path(target_file)
+        target_mask_file = target_file.parent.parent.parent / "mask" / target_file.parent.stem / target_file.name
 
-        target_mask = Image.open(self.mask_files[target_index]).convert("RGB")
+        target_img = Image.open(target_file.as_posix()).convert("RGB")
+        source_img = Image.open(source_file.as_posix()).convert("RGB")
+
+        target_mask = Image.open(target_mask_file.as_posix()).convert("RGB")
 
         source_img = self.transform(source_img)
         target_img = self.transform(target_img)
@@ -106,20 +80,20 @@ class ManyToManyTrainDataset(Dataset):
             "target_image": target_img,
             "target_mask": target_mask,
             "same": same,
-            # "source_img_name": self.img_files[source_index],
-            # "target_img_name": self.img_files[target_index],
-            # "target_mask_name": self.mask_files[target_index],
+            # "source_img_name": source_file.as_posix(),
+            # "target_img_name": target_file.as_posix(),
+            # "target_mask_name": target_mask_file.as_posix(),
         }
 
 
 class OneToManyTrainDataset(Dataset):
-    def __init__(self, img_root: str, mask_root: str, source_name: str, same_rate=0.5):
+    def __init__(self, dataset_root: str, dataset_index: str, source_name: str, same_rate=0.5):
         """
         One-to-many 训练数据集构建
         Parameters:
         -----------
-        img_root: str, 人脸图片的根目录
-        mask_root: str, 人脸图片mask的根目录
+        dataset_root: str, 数据集根目录
+        dataset_index: str, 数据集index文件路径
         source_name: str, source face id的名称, one-to-many里面的one
         same_rate: float, 每个batch里面相同人脸所占的比例
         """
@@ -131,45 +105,13 @@ class OneToManyTrainDataset(Dataset):
                 transforms.ToTensor(),
             ]
         )
-        self.img_root = img_root
-        self.mask_root = mask_root
+        self.data_root = Path(dataset_root)
+        with open(dataset_index, "rb") as f:
+            self.file_index = pickle.load(f, encoding="bytes")
         self.same_rate = same_rate
         self.source_name = source_name
 
-        self.mask_files = []
-
-        img_dir = Path(img_root)
-        self.img_files = set([str(x) for x in img_dir.glob(f"**/*.jpg")])
-
-        mask_dir = Path(mask_root)
-        self.mask_files = set([str(x) for x in mask_dir.glob(f"**/*.jpg")])
-
-        # 移除没有对应mask的图片
-        imgs_without_masks = []
-        for img_path in self.img_files:
-            base_img_path = "/".join(img_path.split("/")[-2:])
-            mask_path = os.path.join(mask_root, base_img_path)
-            if mask_path not in self.mask_files:
-                imgs_without_masks.append(img_path)
-        for img_path in imgs_without_masks:
-            self.img_files.remove(img_path)
-
-        self.img_files: List[str] = list(self.img_files)
-        self.img_files.sort()
-
-        self.mask_files: List[str] = list(self.mask_files)
-        self.mask_files.sort()
-
-        # 把img_files list按照id整理
-        self.img_per_id: Dict[str, List[str]] = {}
-        for idx, img_path in enumerate(self.img_files):
-            id_name = img_path.split("/")[-2]
-            if id_name in self.img_per_id.keys():
-                self.img_per_id[id_name].append(idx)
-            else:
-                self.img_per_id[id_name] = [idx]
-
-        self.id_list: List[str] = list(self.img_per_id.keys())
+        self.id_list: List[str] = list(self.file_index.keys())
 
         try:
             self.source_id_index: int = self.id_list.index(self.source_name)
@@ -178,32 +120,36 @@ class OneToManyTrainDataset(Dataset):
 
         # 所有id都遍历一遍，视为一个epoch
         self.length = len(self.id_list)
-
-        logger.info(f"dataset contains {self.length} ids and {len(self.mask_files)} images")
+        self.image_num = sum([len(v) for v in self.file_index.values()])
+        logger.info(f"dataset contains {self.length} ids and {self.image_num} images")
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, index):
         target_id_index = index
-        target_index = random.choice(self.img_per_id[self.id_list[target_id_index]])
+        target_file = random.choice(self.file_index[self.id_list[target_id_index]])
         if random.random() < self.same_rate:
             # 在相同id的文件列表中选择
-            source_index = random.choice(self.img_per_id[self.id_list[target_id_index]])
+            source_file = random.choice(self.file_index[self.id_list[target_id_index]])
             same = torch.ones(1)
         else:
             # 直接选择source name中的图片
-            source_index = random.choice(self.img_per_id[self.source_name])
+            source_file = random.choice(self.file_index[self.source_name])
             # 如果和target同个id
             if self.source_id_index == target_id_index:
                 same = torch.ones(1)
             else:
                 same = torch.zeros(1)
 
-        target_img = Image.open(self.img_files[target_index]).convert("RGB")
-        source_img = Image.open(self.img_files[source_index]).convert("RGB")
+        source_file = self.data_root / Path(source_file)
+        target_file = self.data_root / Path(target_file)
+        target_mask_file = target_file.parent.parent.parent / "mask" / target_file.parent.stem / target_file.name
 
-        target_mask = Image.open(self.mask_files[target_index]).convert("RGB")
+        target_img = Image.open(target_file.as_posix()).convert("RGB")
+        source_img = Image.open(source_file.as_posix()).convert("RGB")
+
+        target_mask = Image.open(target_mask_file.as_posix()).convert("RGB")
 
         source_img = self.transform(source_img)
         target_img = self.transform(target_img)
@@ -214,9 +160,9 @@ class OneToManyTrainDataset(Dataset):
             "target_image": target_img,
             "target_mask": target_mask,
             "same": same,
-            # "source_img_name": self.img_files[source_index],
-            # "target_img_name": self.img_files[target_index],
-            # "target_mask_name": self.mask_files[target_index],
+            # "source_img_name": source_file.as_posix(),
+            # "target_img_name": target_file.as_posix(),
+            # "target_mask_name": target_mask_file.as_posix(),
         }
 
 
@@ -227,10 +173,10 @@ class TrainDatasetDataLoader:
         """Initialize this class"""
         opt = TrainConfig()
         if opt.mode is FaceSwapMode.MANY_TO_MANY:
-            self.dataset = ManyToManyTrainDataset(opt.img_root, opt.mask_root, opt.same_rate)
+            self.dataset = ManyToManyTrainDataset(opt.dataset_root, opt.dataset_index, opt.same_rate)
         elif opt.mode is FaceSwapMode.ONE_TO_MANY:
             logger.info(f"In one-to-many mode, source face is {opt.source_name}")
-            self.dataset = OneToManyTrainDataset(opt.img_root, opt.mask_root, opt.source_name, opt.same_rate)
+            self.dataset = OneToManyTrainDataset(opt.dataset_root, opt.dataset_index, opt.source_name, opt.same_rate)
         else:
             raise NotImplementedError
         logger.info(f"dataset {type(self.dataset).__name__} created")
@@ -270,7 +216,7 @@ class TrainDatasetDataLoader:
 if __name__ == "__main__":
     dataloader = TrainDatasetDataLoader()
     for idx, data in enumerate(dataloader):
-        print(data["source_img_name"])
-        print(data["target_img_name"])
-        print(data["target_mask_name"])
+        # print(data["source_img_name"])
+        # print(data["target_img_name"])
+        # print(data["target_mask_name"])
         print(data["same"])
