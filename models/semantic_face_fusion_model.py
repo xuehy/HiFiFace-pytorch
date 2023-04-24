@@ -15,8 +15,12 @@ class SemanticFaceFusionModule(nn.Module):
         super(SemanticFaceFusionModule, self).__init__()
 
         self.sigma = ResBlock(256, 256)
-        self.low_mask_predict = ResBlock(256, 1)
-        self.z_fuse_block = AdaInResBlock(256, 256 + 3)
+        self.low_mask_predict = nn.Sequential(nn.Conv2d(256, 1, 3, 1, 1), nn.Sigmoid())
+        self.z_fuse_block_1 = AdaInResBlock(256, 256)
+        self.z_fuse_block_2 = AdaInResBlock(256, 256)
+
+        self.i_low_block = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(256, 3, 3, 1, 1))
+
         self.f_up = UpSamplingBlock()
 
     def forward(self, target_image, z_enc, z_dec, v_sid):
@@ -40,15 +44,14 @@ class SemanticFaceFusionModule(nn.Module):
         # 估算z_dec对应的人脸 low-level feature mask
         m_low = self.low_mask_predict(z_dec)
 
-        m_low = F.sigmoid(m_low)
         # 计算融合的low-level feature map
         # mask区域使用decoder的low-level特征 + 非mask区域使用encoder的low-level特征
         z_fuse = m_low * z_dec + (1 - m_low) * z_enc
 
-        z_fuse = self.z_fuse_block(z_fuse, v_sid)
+        z_fuse = self.z_fuse_block_1(z_fuse, v_sid)
+        z_fuse = self.z_fuse_block_2(z_fuse, v_sid)
 
-        i_low = z_fuse[:, 0:3, ...]
-        z_fuse = z_fuse[:, 3:, ...]
+        i_low = self.i_low_block(z_fuse)
 
         i_low = m_low * i_low + (1 - m_low) * F.interpolate(target_image, scale_factor=0.25)
 
@@ -56,3 +59,15 @@ class SemanticFaceFusionModule(nn.Module):
         i_r = m_r * i_r + (1 - m_r) * target_image
 
         return i_r, i_low, m_r, m_low
+
+
+if __name__ == "__main__":
+    import torch
+
+    timg = torch.randn(1, 3, 256, 256)
+    z_enc = torch.randn(1, 256, 64, 64)
+    z_dec = torch.randn(1, 256, 64, 64)
+    v_sid = torch.randn(1, 769)
+    model = SemanticFaceFusionModule()
+    i_r, i_low, m_r, m_low = model(timg, z_enc, z_dec, v_sid)
+    print(i_r.shape, i_low.shape, m_r.shape, m_low.shape)

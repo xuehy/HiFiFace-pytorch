@@ -3,25 +3,36 @@ import torch.nn.functional as F
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, down_sample=False, up_sample=False):
+    def __init__(self, in_channel, out_channel, down_sample=False, up_sample=False, norm=True):
         super(ResBlock, self).__init__()
 
         main_module_list = []
-        main_module_list += [
-            nn.InstanceNorm2d(in_channel),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=1, padding=1),
-        ]
+        if norm:
+            main_module_list += [
+                nn.InstanceNorm2d(in_channel),
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=1, padding=1),
+            ]
+        else:
+            main_module_list += [
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=1, padding=1),
+            ]
         if down_sample:
             main_module_list.append(nn.AvgPool2d(kernel_size=2))
         elif up_sample:
             main_module_list.append(nn.Upsample(scale_factor=2, mode="bilinear"))
-
-        main_module_list += [
-            nn.InstanceNorm2d(out_channel),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1),
-        ]
+        if norm:
+            main_module_list += [
+                nn.InstanceNorm2d(out_channel),
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1),
+            ]
+        else:
+            main_module_list += [
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1),
+            ]
         self.main_path = nn.Sequential(*main_module_list)
 
         side_module_list = [nn.Conv2d(in_channel, out_channel, kernel_size=1, stride=1, padding=0)]
@@ -100,15 +111,12 @@ class UpSamplingBlock(nn.Module):
         self,
     ):
         super(UpSamplingBlock, self).__init__()
-        self.net = nn.Sequential(
-            ResBlock(256, 64, up_sample=True),
-            ResBlock(64, 16, up_sample=True),
-            ResBlock(16, 8),
-            ResBlock(8, 4),
-        )
+        self.net = nn.Sequential(ResBlock(256, 256, up_sample=True), ResBlock(256, 256, up_sample=True))
+        self.i_r_net = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(256, 3, 3, 1, 1))
+        self.m_r_net = nn.Sequential(nn.Conv2d(256, 1, 3, 1, 1), nn.Sigmoid())
 
     def forward(self, x):
         x = self.net(x)
-        m_r, i_r = x[:, 0, ...].unsqueeze(1), x[:, 1:, ...]
-        m_r = F.sigmoid(m_r)
+        i_r = self.i_r_net(x)
+        m_r = self.m_r_net(x)
         return i_r, m_r

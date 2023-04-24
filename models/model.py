@@ -14,8 +14,9 @@ from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
 from Deep3DFaceRecon_pytorch.models.networks import ReconNetWrapper
-from models.discriminator import MultiscaleDiscriminator
-from models.gan_loss import MultiScaleGANLoss
+from models.discriminator import Discriminator
+from models.gan_loss import GANLoss
+from models.gan_loss import gradient_penalty
 from models.generator import Generator
 
 
@@ -33,14 +34,14 @@ class HifiFace:
         self.use_ddp = TrainConfig().use_ddp
         self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
         # 判别器的定义还不对，可能需要对照论文里面的图片进行修改
-        self.discriminator = MultiscaleDiscriminator(3)
+        self.discriminator = Discriminator(3)
 
         self.is_training = is_training
 
         if self.is_training:
             self.l1_loss = nn.L1Loss()
             self.loss_fn_vgg = lpips.LPIPS(net="vgg")
-            self.adv_loss = MultiScaleGANLoss(gan_mode="original")
+            self.adv_loss = GANLoss()
 
             # 3D人脸重建模型
             self.f_3d = ReconNetWrapper(net_recon="resnet50", use_last_fc=False)
@@ -256,8 +257,19 @@ class HifiFace:
         d_fake = self.discriminator(i_r.detach())
         loss_real = self.adv_loss(d_gt, True)
         loss_fake = self.adv_loss(d_fake, False)
-        loss_discriminator = loss_real + loss_fake
-        return {"loss_real": loss_real, "loss_fake": loss_fake, "loss_discriminator": loss_discriminator}
+
+        alpha = torch.rand(target_img.shape[0], 1, 1, 1).to(target_img.device)
+        x_hat = (alpha * target_img.data + (1 - alpha) * i_r.data).requires_grad_(True)
+        out = self.discriminator(x_hat)
+        loss_gp = gradient_penalty(out, x_hat)
+
+        loss_discriminator = loss_real + loss_fake + 10 * loss_gp
+        return {
+            "loss_real": loss_real,
+            "loss_fake": loss_fake,
+            "loss_gp": loss_gp,
+            "loss_discriminator": loss_discriminator,
+        }
 
     def forward(
         self,
