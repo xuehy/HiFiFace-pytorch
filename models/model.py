@@ -258,16 +258,16 @@ class HifiFace:
         loss_real = self.adv_loss(d_gt, True)
         loss_fake = self.adv_loss(d_fake, False)
 
-        alpha = torch.rand(target_img.shape[0], 1, 1, 1).to(target_img.device)
-        x_hat = (alpha * target_img.data + (1 - alpha) * i_r.data).requires_grad_(True)
-        out = self.discriminator(x_hat)
-        loss_gp = gradient_penalty(out, x_hat)
+        # alpha = torch.rand(target_img.shape[0], 1, 1, 1).to(target_img.device)
+        # x_hat = (alpha * target_img.data + (1 - alpha) * i_r.data).requires_grad_(True)
+        # out = self.discriminator(x_hat)
+        # loss_gp = gradient_penalty(out, x_hat)
 
-        loss_discriminator = loss_real + loss_fake + 10 * loss_gp
+        loss_discriminator = loss_real + loss_fake  # + 10 * loss_gp
         return {
             "loss_real": loss_real,
             "loss_fake": loss_fake,
-            "loss_gp": loss_gp,
+            # "loss_gp": loss_gp,
             "loss_discriminator": loss_discriminator,
         }
 
