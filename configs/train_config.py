@@ -12,14 +12,14 @@ class TrainConfig:
     mode = FaceSwapMode.MANY_TO_MANY
     source_name: str = ""
 
-    dataset_index: str = "/data/dataset/faceswap/asia-celeb.pkl"
+    dataset_index: str = "/data/dataset/faceswap/large.pkl"
     dataset_root: str = "/data/dataset/faceswap"
 
     batch_size: int = 8
     num_threads: int = 8
-    same_rate: float = 0.4
-    lr: float = 2e-5
-    grad_clip: float = 100.0
+    same_rate: float = 0.5
+    lr: float = 5e-5
+    grad_clip: float = 1000.0
 
     use_ddp: bool = False
 
@@ -36,7 +36,7 @@ class TrainConfig:
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "baseline_vgg"
+    exp_name: str = "baseline"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 
