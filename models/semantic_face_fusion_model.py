@@ -16,10 +16,10 @@ class SemanticFaceFusionModule(nn.Module):
 
         self.sigma = ResBlock(256, 256)
         self.low_mask_predict = nn.Sequential(nn.Conv2d(256, 1, 3, 1, 1), nn.Sigmoid())
-        self.z_fuse_block_1 = AdaInResBlock(256, 256)
-        self.z_fuse_block_2 = AdaInResBlock(256, 256)
+        self.z_fuse_block_1 = AdaInResBlock(256, 128)
+        self.z_fuse_block_2 = AdaInResBlock(128, 64)
 
-        self.i_low_block = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(256, 3, 3, 1, 1))
+        self.i_low_block = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(64, 3, 3, 1, 1))
 
         self.f_up = UpSamplingBlock()
 
