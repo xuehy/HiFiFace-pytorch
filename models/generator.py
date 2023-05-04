@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+from models.init_weight import init_net
 from models.model_blocks import AdaInResBlock
 from models.model_blocks import ResBlock
 from models.semantic_face_fusion_model import SemanticFaceFusionModule
@@ -78,9 +79,9 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.id_extractor = ShapeAwareIdentityExtractor(identity_extractor_config)
         self.id_extractor.requires_grad_(False)
-        self.encoder = Encoder()
-        self.decoder = Decoder()
-        self.sff_module = SemanticFaceFusionModule()
+        self.encoder = init_net(Encoder())
+        self.decoder = init_net(Decoder())
+        self.sff_module = init_net(SemanticFaceFusionModule())
 
     def forward(self, i_source, i_target, need_id_grad=False):
         """

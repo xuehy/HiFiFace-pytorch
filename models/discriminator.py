@@ -1,6 +1,7 @@
 import numpy as np
 import torch.nn as nn
 
+from models.init_weight import init_net
 from models.model_blocks import ResBlock
 
 
@@ -20,7 +21,7 @@ class Discriminator(nn.Module):
             nn.Conv2d(512, 2, kernel_size=1, stride=1, padding=0),
             nn.LeakyReLU(0.2, inplace=True),
         ]
-        self.sequence = nn.Sequential(*sequence)
+        self.sequence = init_net(nn.Sequential(*sequence))
 
     def forward(self, input):
         return self.sequence(input)
