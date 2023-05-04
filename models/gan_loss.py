@@ -3,16 +3,29 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class GANLoss(nn.Module):
-    def __init__(self, target_real_label=1.0, target_fake_label=0.0, tensor=torch.FloatTensor, opt=None):
-        super(GANLoss, self).__init__()
+class MultiScaleGANLoss(nn.Module):
+    def __init__(
+        self, gan_mode="hinge", target_real_label=1.0, target_fake_label=0.0, tensor=torch.FloatTensor, opt=None
+    ):
+        super(MultiScaleGANLoss, self).__init__()
         self.real_label = target_real_label
         self.fake_label = target_fake_label
         self.real_label_tensor = None
         self.fake_label_tensor = None
         self.zero_tensor = None
         self.Tensor = tensor
+        self.gan_mode = gan_mode
         self.opt = opt
+        if gan_mode == "ls":
+            pass
+        elif gan_mode == "original":
+            pass
+        elif gan_mode == "w":
+            pass
+        elif gan_mode == "hinge":
+            pass
+        else:
+            raise ValueError("Unexpected gan_mode {}".format(gan_mode))
 
     def get_target_tensor(self, input, target_is_real):
         if target_is_real:
@@ -24,9 +37,31 @@ class GANLoss(nn.Module):
         return torch.zeros_like(input).detach()
 
     def loss(self, inputs, target_is_real, for_discriminator=True):
-        target_tensor = self.get_target_tensor(inputs, target_is_real)
-        loss = F.binary_cross_entropy_with_logits(inputs, target_tensor)
-        return loss
+        if self.gan_mode == "original":  # cross entropy loss
+            target_tensor = self.get_target_tensor(inputs, target_is_real)
+            loss = F.binary_cross_entropy_with_logits(inputs, target_tensor)
+            return loss
+        elif self.gan_mode == "ls":
+            target_tensor = self.get_target_tensor(inputs, target_is_real)
+            return F.mse_loss(inputs, target_tensor)
+        elif self.gan_mode == "hinge":
+            if for_discriminator:
+                if target_is_real:
+                    minval = torch.min(inputs - 1, self.get_zero_tensor(inputs))
+                    loss = -torch.mean(minval)
+                else:
+                    minval = torch.min(-inputs - 1, self.get_zero_tensor(inputs))
+                    loss = -torch.mean(minval)
+            else:
+                assert target_is_real, "The generator's hinge loss must be aiming for real"
+                loss = -torch.mean(inputs)
+            return loss
+        else:
+            # wgan
+            if target_is_real:
+                return -inputs.mean()
+            else:
+                return inputs.mean()
 
     def __call__(self, inputs, target_is_real, for_discriminator=True):
         # computing loss is a bit complicated because |input| may not be
@@ -43,15 +78,3 @@ class GANLoss(nn.Module):
             return loss / len(inputs)
         else:
             return self.loss(inputs, target_is_real, for_discriminator)
-
-
-def gradient_penalty(y, x):
-
-    weight = torch.ones(y.size()).to(y.device)
-    dydx = torch.autograd.grad(
-        outputs=y, inputs=x, grad_outputs=weight, retain_graph=True, create_graph=True, only_inputs=True
-    )[0]
-    dydx = dydx.view(dydx.size(0), -1)
-    dydx_l2norm = torch.sqrt(torch.sum(dydx**2, dim=1))
-
-    return torch.mean((dydx_l2norm - 1) ** 2)
