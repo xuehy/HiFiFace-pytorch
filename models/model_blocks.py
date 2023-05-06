@@ -63,7 +63,7 @@ class AdaIn(nn.Module):
         mean_style = mean_style.unsqueeze(-1).unsqueeze(-1)
 
         x = F.instance_norm(x)
-        x = std_style * x + mean_style
+        x = (1 + std_style) * x + mean_style
         return x
 
 
