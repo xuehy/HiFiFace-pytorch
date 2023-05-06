@@ -111,9 +111,9 @@ class UpSamplingBlock(nn.Module):
         self,
     ):
         super(UpSamplingBlock, self).__init__()
-        self.net = nn.Sequential(ResBlock(64, 64, up_sample=True), ResBlock(64, 64, up_sample=True))
-        self.i_r_net = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(64, 3, 3, 1, 1))
-        self.m_r_net = nn.Sequential(nn.Conv2d(64, 1, 3, 1, 1), nn.Sigmoid())
+        self.net = nn.Sequential(ResBlock(256, 256, up_sample=True), ResBlock(256, 256, up_sample=True))
+        self.i_r_net = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(256, 3, 3, 1, 1))
+        self.m_r_net = nn.Sequential(nn.Conv2d(256, 1, 3, 1, 1), nn.Sigmoid())
 
     def forward(self, x):
         x = self.net(x)
