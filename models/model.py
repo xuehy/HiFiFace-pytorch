@@ -14,8 +14,8 @@ from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
 from Deep3DFaceRecon_pytorch.models.networks import ReconNetWrapper
-from models.discriminator import Discriminator
-from models.gan_loss import GANLoss
+from models.discriminator import MultiscaleDiscriminator
+from models.gan_loss import MultiScaleGANLoss
 from models.generator import Generator
 from models.init_weight import init_net
 
@@ -33,15 +33,15 @@ class HifiFace:
         self.lr = TrainConfig().lr
         self.use_ddp = TrainConfig().use_ddp
         self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
-        # 判别器的定义还不对，可能需要对照论文里面的图片进行修改
-        self.discriminator = init_net(Discriminator(3))
+
+        self.discriminator = init_net(MultiscaleDiscriminator(3))
 
         self.is_training = is_training
 
         if self.is_training:
             self.l1_loss = nn.L1Loss()
             self.loss_fn_vgg = lpips.LPIPS(net="vgg")
-            self.adv_loss = GANLoss()
+            self.adv_loss = MultiScaleGANLoss(gan_mode="original")
 
             # 3D人脸重建模型
             self.f_3d = ReconNetWrapper(net_recon="resnet50", use_last_fc=False)
