@@ -22,7 +22,7 @@ class TrainConfig:
     grad_clip: float = 1000.0
 
     amp: bool = False
-    use_ddp: bool = False
+    use_ddp: bool = True
 
     load_checkpoint = None
 
@@ -37,7 +37,7 @@ class TrainConfig:
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "baseline"
+    exp_name: str = "exp_rsff_msd"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 
