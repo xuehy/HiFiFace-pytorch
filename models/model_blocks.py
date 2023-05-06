@@ -10,12 +10,12 @@ class ResBlock(nn.Module):
         if norm:
             main_module_list += [
                 nn.InstanceNorm2d(in_channel),
-                nn.LeakyReLU(0.2),
+                nn.LeakyReLU(0.2, inplace=True),
                 nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=1, padding=1),
             ]
         else:
             main_module_list += [
-                nn.LeakyReLU(0.2),
+                nn.LeakyReLU(0.2, inplace=True),
                 nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=1, padding=1),
             ]
         if down_sample:
@@ -25,12 +25,12 @@ class ResBlock(nn.Module):
         if norm:
             main_module_list += [
                 nn.InstanceNorm2d(out_channel),
-                nn.LeakyReLU(0.2),
+                nn.LeakyReLU(0.2, inplace=True),
                 nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1),
             ]
         else:
             main_module_list += [
-                nn.LeakyReLU(0.2),
+                nn.LeakyReLU(0.2, inplace=True),
                 nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1),
             ]
         self.main_path = nn.Sequential(*main_module_list)
@@ -78,7 +78,7 @@ class AdaInResBlock(nn.Module):
 
         main_module_list = []
         main_module_list += [
-            nn.LeakyReLU(0.2),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(in_channel, out_channel, kernel_size=3, stride=1, padding=1),
         ]
         if up_sample:
@@ -86,7 +86,7 @@ class AdaInResBlock(nn.Module):
         self.main_path1 = nn.Sequential(*main_module_list)
 
         self.main_path2 = nn.Sequential(
-            nn.LeakyReLU(0.2),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(out_channel, out_channel, kernel_size=3, stride=1, padding=1),
         )
 
