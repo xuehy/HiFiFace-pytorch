@@ -28,6 +28,8 @@ class VideoSwap:
         opt = TrainConfig()
         opt.use_ddp = False
         self.device = "cuda"
+        self.num_frames = 10
+        self.kps_window = []
         checkpoint = (cfg.model_path, cfg.model_idx)
         self.model = HifiFace(
             opt.identity_extractor_config, is_training=False, device=self.device, load_checkpoint=checkpoint
@@ -36,6 +38,7 @@ class VideoSwap:
         self.tmp_dir = os.path.join(self.work_dir, str(uuid.uuid4()))
         os.makedirs(self.tmp_dir, exist_ok=True)
         self.swapped_video = os.path.join(self.tmp_dir, "swapped_video.mp4")
+        self.swapped_video_with_audio = os.path.join(self.tmp_dir, "swapped_video_with_audio.mp4")
         self.FFMPEG_COMMAND = "/data/tools/ffmpeg-5.1.1-amd64-static/ffmpeg"
 
         video = cv2.VideoCapture(self.target_video)
@@ -98,22 +101,38 @@ class VideoSwap:
         )
         return swapped_image, square_mask
 
-    def detect_and_align(self, image):
+    def smooth_kps(self, kps):
+        self.kps_window.append(kps.flatten())
+        self.kps_window = self.kps_window[1:]
+        X = np.stack(self.kps_window, axis=1)
+        y = self.kps_window[-1]
+        y_cor = X @ np.linalg.inv(X.transpose() @ X - 0.0007 * np.eye(self.num_frames)) @ X.transpose() @ y
+        self.kps_window[-1] = y_cor
+        return y_cor.reshape((5, 2))
+
+    def detect_and_align(self, image, src_is=False):
         detection = self.facedetector(image)
         if detection.score is None:
+            self.kps_window = []
             return None, None
         max_score_ind = np.argmax(detection.score, axis=0)
         kps = detection.key_points[max_score_ind]
+        if len(self.kps_window) < self.num_frames:
+            self.kps_window.append(kps.flatten())
+        else:
+            kps = self.smooth_kps(kps)
         align_img, warp_mat = self.alignface.align_face(image, kps, 256)
         align_img = cv2.resize(align_img, (256, 256))
         align_img = align_img.transpose(2, 0, 1)
         align_img = torch.from_numpy(align_img).unsqueeze(0).to(self.device).float()
         align_img = align_img / 255.0
+        if src_is:
+            self.kps_window = []
         return align_img, warp_mat
 
     def inference(self):
         src = cv2.cvtColor(cv2.imread(self.source_face), cv2.COLOR_BGR2RGB)
-        src, _ = self.detect_and_align(src)
+        src, _ = self.detect_and_align(src, src_is=True)
         logger.info("start swapping")
         sr = StreamReader(self.target_video)
         sr.add_video_stream(frames_per_chunk=1, decoder="h264_cuvid", decoder_option={"gpu": "0"}, hw_accel="cuda:0")
@@ -141,6 +160,9 @@ class VideoSwap:
                     result_face = (1 - square_mask) * chunk + square_mask * swapped_face
                 result_face = torch.clamp(result_face * 255.0, 0.0, 255.0, out=None).type(dtype=torch.uint8)
                 sw.write_video_chunk(0, result_face)
+        command = f"{self.FFMPEG_COMMAND} -loglevel error -i {self.swapped_video} -i {self.target_video} -c copy \
+            -map 0 -map 1:1? -y -shortest {self.swapped_video_with_audio}"
+        os.system(command)
 
 
 class ConfigPath:
