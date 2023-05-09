@@ -7,6 +7,8 @@ import kornia
 import numpy as np
 import torch
 from loguru import logger
+from torchaudio.io import StreamReader
+from torchaudio.io import StreamWriter
 
 from benchmark.face_pipeline import alignFace
 from benchmark.face_pipeline import FaceDetector
@@ -14,7 +16,6 @@ from benchmark.face_pipeline import inverse_transform_batch
 from benchmark.face_pipeline import tensor2img
 from configs.train_config import TrainConfig
 from models.model import HifiFace
-from torchaudio.io import StreamReader, StreamWriter
 
 
 class VideoSwap:
@@ -36,7 +37,7 @@ class VideoSwap:
         os.makedirs(self.tmp_dir, exist_ok=True)
         self.swapped_video = os.path.join(self.tmp_dir, "swapped_video.mp4")
         self.FFMPEG_COMMAND = "/data/tools/ffmpeg-5.1.1-amd64-static/ffmpeg"
-        
+
         video = cv2.VideoCapture(self.target_video)
         # 获取视频宽度
         frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -45,7 +46,8 @@ class VideoSwap:
         # 获取帧率
         frame_rate = int(video.get(cv2.CAP_PROP_FPS))
         video.release()
-        
+        self.frame_size = (frame_height, frame_width)
+
         self.encode_config = {
             "encoder": "h264_nvenc",  # GPU Encoder
             "encoder_format": "rgb0",
@@ -56,6 +58,23 @@ class VideoSwap:
             "width": frame_width,
             "format": "rgb24",
         }
+
+    def yuv_to_rgb(self, img):
+        img = img.to(torch.float)
+        y = img[..., 0, :, :]
+        u = img[..., 1, :, :]
+        v = img[..., 2, :, :]
+        y /= 255
+
+        u = u / 255 - 0.5
+        v = v / 255 - 0.5
+
+        r = y + 1.14 * v
+        g = y + -0.396 * u - 0.581 * v
+        b = y + 2.029 * u
+
+        rgb = torch.stack([r, g, b], -1)
+        return rgb
 
     def _geometry_transfrom_warp_affine(self, swapped_image, inv_att_transforms, frame_size, square_mask):
         swapped_image = kornia.geometry.transform.warp_affine(
@@ -79,9 +98,10 @@ class VideoSwap:
         )
         return swapped_image, square_mask
 
-
     def detect_and_align(self, image):
         detection = self.facedetector(image)
+        if detection.score is None:
+            return None, None
         max_score_ind = np.argmax(detection.score, axis=0)
         kps = detection.key_points[max_score_ind]
         align_img, warp_mat = self.alignface.align_face(image, kps, 256)
@@ -95,28 +115,31 @@ class VideoSwap:
         src = cv2.cvtColor(cv2.imread(self.source_face), cv2.COLOR_BGR2RGB)
         src, _ = self.detect_and_align(src)
         logger.info("start swapping")
-        
         sr = StreamReader(self.target_video)
-        sr.add_basic_video_stream(1,format='rgb24')
+        sr.add_video_stream(frames_per_chunk=1, decoder="h264_cuvid", decoder_option={"gpu": "0"}, hw_accel="cuda:0")
         sw = StreamWriter(self.swapped_video)
         sw.add_video_stream(**self.encode_config)
         with sw.open():
-            for (chunk, ) in sr.stream():
-                image = chunk[0].numpy().transpose(1,2,0)
+            for (chunk,) in sr.stream():
+                # StreamReader cuda decode颜色格式默认为yuv需要转为rgb
+                chunk = self.yuv_to_rgb(chunk)
+                image = (chunk * 255).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
                 align_img, warp_mat = self.detect_and_align(image)
-                frame_size = (chunk.shape[2], chunk.shape[3])
-                with torch.no_grad():
-                    swapped_face = self.model.forward(src, align_img)
-                    swapped_face = torch.clamp(swapped_face, 0, 1)
-                chunk = (chunk.float()/255.0).cuda()
-                warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
-                inverse_warp_mat = inverse_transform_batch(warp_mat)
-                square_mask = torch.ones_like(swapped_face).cuda()
-                swapped_face, square_mask = self._geometry_transfrom_warp_affine(
-                    swapped_face, inverse_warp_mat, frame_size, square_mask
-                )
-                result_face = (1 - square_mask) * chunk + square_mask * swapped_face
-                result_face = torch.clamp(result_face*255.0, 0.0, 255.0, out=None).type(dtype=torch.uint8)
+                chunk = chunk.transpose(3, 2).transpose(2, 1)
+                if align_img is None:
+                    result_face = chunk
+                else:
+                    with torch.no_grad():
+                        swapped_face = self.model.forward(src, align_img)
+                        swapped_face = torch.clamp(swapped_face, 0, 1)
+                    warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
+                    inverse_warp_mat = inverse_transform_batch(warp_mat)
+                    square_mask = torch.ones_like(swapped_face).cuda()
+                    swapped_face, square_mask = self._geometry_transfrom_warp_affine(
+                        swapped_face, inverse_warp_mat, self.frame_size, square_mask
+                    )
+                    result_face = (1 - square_mask) * chunk + square_mask * swapped_face
+                result_face = torch.clamp(result_face * 255.0, 0.0, 255.0, out=None).type(dtype=torch.uint8)
                 sw.write_video_chunk(0, result_face)
 
 
