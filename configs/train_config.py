@@ -23,12 +23,14 @@ class TrainConfig:
 
     use_ddp: bool = True
 
-    load_checkpoint = None
+    eye_hm_loss: bool = False
+    load_checkpoint = None  # ("/data/checkpoints/hififace/rebuilt_discriminator_SFF_c256_1683367464544", 400000)
 
     identity_extractor_config = {
         "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20.pth",
         "f_id_checkpoint_path": "/data/useful_ckpt/arcface/ms1mv3_arcface_r100_fp16_backbone.pth",
         "bfm_folder": "/data/useful_ckpt/BFM",
+        "model_ft_path": "/data/useful_ckpt/AWL_detector/WFLW_4HG.pth",
     }
 
     visualize_interval: int = 100

@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from loguru import logger
 
+from AdaptiveWingLoss.aux import detect_landmarks
+from AdaptiveWingLoss.core import models
 from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
@@ -40,6 +42,8 @@ class HifiFace:
 
         if self.is_training:
             self.l1_loss = nn.L1Loss()
+            if TrainConfig().eye_hm_loss:
+                self.mse_loss = nn.MSELoss()
             self.loss_fn_vgg = lpips.LPIPS(net="vgg")
             self.adv_loss = GANLoss()
 
@@ -57,6 +61,17 @@ class HifiFace:
             self.f_id.load_state_dict(torch.load(identity_extractor_config["f_id_checkpoint_path"], map_location="cpu"))
             self.f_id.eval()
 
+            # eye heatmap model
+            if TrainConfig().eye_hm_loss:
+                self.model_ft = models.FAN(4, "False", "False", 98)
+                checkpoint = torch.load(identity_extractor_config["model_ft_path"], map_location="cpu")
+                pretrained_weights = checkpoint["state_dict"]
+                model_weights = self.model_ft.state_dict()
+                pretrained_weights = {k: v for k, v in pretrained_weights.items() if k in model_weights}
+                model_weights.update(pretrained_weights)
+                self.model_ft.load_state_dict(model_weights)
+                self.model_ft.eval()
+
             self.lambda_adv = 1
             self.lambda_seg = 100
             self.lambda_rec = 20
@@ -65,6 +80,7 @@ class HifiFace:
 
             self.lambda_shape = 0.5
             self.lambda_id = 5
+            self.lambda_eye_hm = 200.0
 
             self.dilation_kernel = torch.ones(5, 5)
 
@@ -105,15 +121,22 @@ class HifiFace:
 
         if self.is_training:
             self.l1_loss.to(device)
+            if TrainConfig().eye_hm_loss:
+                self.mse_loss.to(device)
             self.f_3d.to(device)
             self.f_id.to(device)
 
             self.loss_fn_vgg.to(device)
             self.face_model.to(device)
             self.adv_loss.to(device)
+            if TrainConfig().eye_hm_loss:
+                self.model_ft.to(device)
             self.f_3d.requires_grad_(False)
             self.f_id.requires_grad_(False)
             self.loss_fn_vgg.requires_grad_(False)
+            if TrainConfig().eye_hm_loss:
+                self.model_ft.requires_grad_(False)
+
             self.dilation_kernel = self.dilation_kernel.to(device)
             if self.use_ddp:
                 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -226,25 +249,40 @@ class HifiFace:
             + self.lambda_lpips * loss_perceptual
         )
 
+        # eye hm loss
+        loss_eye_hm = 0
+        if TrainConfig().eye_hm_loss:
+            target_heatmap_left, target_heatmap_right = detect_landmarks(target_img, self.model_ft)
+            r_heatmap_left, r_heatmap_right = detect_landmarks(i_r, self.model_ft)
+            loss_eye_hm = self.mse_loss(r_heatmap_left, target_heatmap_left) + self.mse_loss(
+                r_heatmap_right, target_heatmap_right
+            )
+
+            loss_realism = loss_realism + self.lambda_eye_hm * loss_eye_hm
+
         loss_generator = loss_sid + loss_realism
+
+        loss_dict = {
+            "loss_shape": loss_shape,
+            "loss_id": loss_id,
+            "loss_sid": loss_sid,
+            "loss_cycle": loss_cycle,
+            "loss_segmentation": loss_segmentation,
+            "loss_reconstruction": loss_reconstruction,
+            "loss_perceptual": loss_perceptual,
+            "loss_adversarial": loss_adversarial,
+            "loss_realism": loss_realism,
+            "loss_generator": loss_generator,
+        }
+        if TrainConfig().eye_hm_loss:
+            loss_dict.update({"loss_eye_hm": loss_eye_hm})
         return (
             source_img,
             target_img,
             i_cycle.detach(),
             i_r.detach(),
             m_r.detach(),
-            {
-                "loss_shape": loss_shape,
-                "loss_id": loss_id,
-                "loss_sid": loss_sid,
-                "loss_cycle": loss_cycle,
-                "loss_segmentation": loss_segmentation,
-                "loss_reconstruction": loss_reconstruction,
-                "loss_perceptual": loss_perceptual,
-                "loss_adversarial": loss_adversarial,
-                "loss_realism": loss_realism,
-                "loss_generator": loss_generator,
-            },
+            loss_dict,
         )
 
     def train_forward_discriminator(self, target_img, i_r):
