@@ -16,19 +16,19 @@ class AddCoordsTh(nn.Module):
         """
         batch_size_tensor = input_tensor.shape[0]
 
-        xx_ones = torch.ones([1, self.y_dim], dtype=torch.int32).cuda()
+        xx_ones = torch.ones([1, self.y_dim], dtype=torch.int32).to(input_tensor.device)
         xx_ones = xx_ones.unsqueeze(-1)
 
-        xx_range = torch.arange(self.x_dim, dtype=torch.int32).unsqueeze(0).cuda()
+        xx_range = torch.arange(self.x_dim, dtype=torch.int32).unsqueeze(0).to(input_tensor.device)
         xx_range = xx_range.unsqueeze(1)
 
         xx_channel = torch.matmul(xx_ones.float(), xx_range.float())
         xx_channel = xx_channel.unsqueeze(-1)
 
-        yy_ones = torch.ones([1, self.x_dim], dtype=torch.int32).cuda()
+        yy_ones = torch.ones([1, self.x_dim], dtype=torch.int32).to(input_tensor.device)
         yy_ones = yy_ones.unsqueeze(1)
 
-        yy_range = torch.arange(self.y_dim, dtype=torch.int32).unsqueeze(0).cuda()
+        yy_range = torch.arange(self.y_dim, dtype=torch.int32).unsqueeze(0).to(input_tensor.device)
         yy_range = yy_range.unsqueeze(-1)
 
         yy_channel = torch.matmul(yy_range.float(), yy_ones.float())
@@ -53,8 +53,8 @@ class AddCoordsTh(nn.Module):
             xx_boundary_channel = torch.where(boundary_channel > 0.05, xx_channel, zero_tensor)
             yy_boundary_channel = torch.where(boundary_channel > 0.05, yy_channel, zero_tensor)
         if self.with_boundary and type(heatmap) != type(None):
-            xx_boundary_channel = xx_boundary_channel.cuda()
-            yy_boundary_channel = yy_boundary_channel.cuda()
+            xx_boundary_channel = xx_boundary_channel.to(input_tensor.device)
+            yy_boundary_channel = yy_boundary_channel.to(input_tensor.device)
         ret = torch.cat([input_tensor, xx_channel, yy_channel], dim=1)
 
         if self.with_r:
@@ -117,15 +117,15 @@ class AddCoords(nn.Module):
         yy_channel = yy_channel.repeat(batch_size, 1, 1, 1).transpose(2, 3)
 
         if input_tensor.is_cuda:
-            xx_channel = xx_channel.cuda()
-            yy_channel = yy_channel.cuda()
+            xx_channel = xx_channel.to(input_tensor.device)
+            yy_channel = yy_channel.to(input_tensor.device)
 
         ret = torch.cat([input_tensor, xx_channel.type_as(input_tensor), yy_channel.type_as(input_tensor)], dim=1)
 
         if self.with_r:
             rr = torch.sqrt(torch.pow(xx_channel - 0.5, 2) + torch.pow(yy_channel - 0.5, 2))
             if input_tensor.is_cuda:
-                rr = rr.cuda()
+                rr = rr.to(input_tensor.device)
             ret = torch.cat([ret, rr], dim=1)
 
         return ret
