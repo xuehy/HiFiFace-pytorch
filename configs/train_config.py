@@ -21,7 +21,6 @@ class TrainConfig:
     lr: float = 5e-5
     grad_clip: float = 1000.0
 
-    amp: bool = False
     use_ddp: bool = True
 
     load_checkpoint = None

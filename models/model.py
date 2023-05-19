@@ -131,10 +131,6 @@ class HifiFace:
             self.g_optimizer = torch.optim.AdamW(self.generator.parameters(), lr=self.lr, betas=[0, 0.999])
             self.d_optimizer = torch.optim.AdamW(self.discriminator.parameters(), lr=self.lr, betas=[0, 0.999])
 
-            if TrainConfig().amp:
-                self.scaler_G = GradScaler()
-                self.scaler_D = GradScaler()
-
     def train(self):
         self.generator.train()
         self.discriminator.train()
@@ -319,43 +315,21 @@ class HifiFace:
         Tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         loss_dict, source_img, target_img, m_r(预测的mask), i_r（换脸结果)
         """
-        if TrainConfig().amp:
-            with autocast():
-                src_img, tgt_img, i_cycle, i_r, m_r, loss_G_dict = self.train_forward_generator(
-                    source_img, target_img, target_mask, same_id_mask
-                )
-                loss_G = loss_G_dict["loss_generator"]
-                self.g_optimizer.zero_grad()
-                self.scaler_G.scale(loss_G).backward()
-                self.scaler_G.unscale_(self.g_optimizer)
-                global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
-                self.scaler_G.step(self.g_optimizer)
-                self.scaler_G.update()
+        src_img, tgt_img, i_cycle, i_r, m_r, loss_G_dict = self.train_forward_generator(
+            source_img, target_img, target_mask, same_id_mask
+        )
+        loss_G = loss_G_dict["loss_generator"]
+        self.g_optimizer.zero_grad()
+        loss_G.backward()
+        global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
+        self.g_optimizer.step()
 
-                loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
-                loss_D = loss_D_dict["loss_discriminator"]
-                self.d_optimizer.zero_grad()
-                self.scaler_D.scale(loss_D).backward()
-                self.scaler_D.unscale_(self.d_optimizer)
-                global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
-                self.scaler_D.step(self.d_optimizer)
-                self.scaler_D.update()
-        else:
-            src_img, tgt_img, i_cycle, i_r, m_r, loss_G_dict = self.train_forward_generator(
-                source_img, target_img, target_mask, same_id_mask
-            )
-            loss_G = loss_G_dict["loss_generator"]
-            self.g_optimizer.zero_grad()
-            loss_G.backward()
-            global_norm_G = torch.nn.utils.clip_grad_norm_(self.generator.parameters(), self.grad_clip)
-            self.g_optimizer.step()
-
-            loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
-            loss_D = loss_D_dict["loss_discriminator"]
-            self.d_optimizer.zero_grad()
-            loss_D.backward()
-            global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
-            self.d_optimizer.step()
+        loss_D_dict = self.train_forward_discriminator(tgt_img, i_r)
+        loss_D = loss_D_dict["loss_discriminator"]
+        self.d_optimizer.zero_grad()
+        loss_D.backward()
+        global_norm_D = torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), self.grad_clip)
+        self.d_optimizer.step()
 
         total_loss_dict = {"global_norm_G": global_norm_G, "global_norm_D": global_norm_D}
         total_loss_dict.update(loss_G_dict)
