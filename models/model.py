@@ -80,7 +80,7 @@ class HifiFace:
 
             self.lambda_shape = 0.5
             self.lambda_id = 5
-            self.lambda_eye_hm = 200.0
+            self.lambda_eye_hm = 1000.0
 
             self.dilation_kernel = torch.ones(5, 5)
 
