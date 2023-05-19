@@ -22,7 +22,7 @@ class TrainConfig:
     grad_clip: float = 1000.0
 
     use_ddp: bool = True
-
+    mouse_mask: bool = True
     eye_hm_loss: bool = False
     load_checkpoint = None  # ("/data/checkpoints/hififace/rebuilt_discriminator_SFF_c256_1683367464544", 400000)
 

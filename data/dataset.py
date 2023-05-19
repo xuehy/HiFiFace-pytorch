@@ -44,7 +44,10 @@ class ManyToManyTrainDataset(Dataset):
         # 所有id都遍历一遍，视为一个epoch
         self.length = len(self.id_list)
         self.image_num = sum([len(v) for v in self.file_index.values()])
+
+        self.mask_dir = "mask" if TrainConfig.mouse_mask else "mask_no_mouth"
         logger.info(f"dataset contains {self.length} ids and {self.image_num} images")
+        logger.info(f"will use mask mode: {self.mask_dir}")
 
     def __len__(self):
         return self.length
@@ -64,7 +67,7 @@ class ManyToManyTrainDataset(Dataset):
 
         source_file = self.data_root / Path(source_file)
         target_file = self.data_root / Path(target_file)
-        target_mask_file = target_file.parent.parent.parent / "mask" / target_file.parent.stem / target_file.name
+        target_mask_file = target_file.parent.parent.parent / self.mask_dir / target_file.parent.stem / target_file.name
 
         target_img = Image.open(target_file.as_posix()).convert("RGB")
         source_img = Image.open(source_file.as_posix()).convert("RGB")
@@ -121,7 +124,9 @@ class OneToManyTrainDataset(Dataset):
         # 所有id都遍历一遍，视为一个epoch
         self.length = len(self.id_list)
         self.image_num = sum([len(v) for v in self.file_index.values()])
+        self.mask_dir = "mask" if TrainConfig.mouse_mask else "mask_no_mouth"
         logger.info(f"dataset contains {self.length} ids and {self.image_num} images")
+        logger.info(f"will use mask mode: {self.mask_dir}")
 
     def __len__(self):
         return self.length
@@ -144,7 +149,7 @@ class OneToManyTrainDataset(Dataset):
 
         source_file = self.data_root / Path(source_file)
         target_file = self.data_root / Path(target_file)
-        target_mask_file = target_file.parent.parent.parent / "mask" / target_file.parent.stem / target_file.name
+        target_mask_file = target_file.parent.parent.parent / self.mask_dir / target_file.parent.stem / target_file.name
 
         target_img = Image.open(target_file.as_posix()).convert("RGB")
         source_img = Image.open(source_file.as_posix()).convert("RGB")
