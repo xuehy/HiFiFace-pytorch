@@ -14,14 +14,10 @@ from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
 from Deep3DFaceRecon_pytorch.models.networks import ReconNetWrapper
-from models.discriminator import MultiscaleDiscriminator
-from models.gan_loss import MultiScaleGANLoss
+from models.discriminator import Discriminator
+from models.gan_loss import GANLoss
 from models.generator import Generator
 from models.init_weight import init_net
-
-if TrainConfig().amp:
-    from torch.cuda.amp import autocast as autocast
-    from torch.cuda.amp import GradScaler
 
 
 class HifiFace:
@@ -38,14 +34,14 @@ class HifiFace:
         self.use_ddp = TrainConfig().use_ddp
         self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
 
-        self.discriminator = init_net(MultiscaleDiscriminator(3))
+        self.discriminator = init_net(Discriminator(3))
 
         self.is_training = is_training
 
         if self.is_training:
             self.l1_loss = nn.L1Loss()
             self.loss_fn_vgg = lpips.LPIPS(net="vgg")
-            self.adv_loss = MultiScaleGANLoss(gan_mode="original")
+            self.adv_loss = GANLoss()
 
             # 3D人脸重建模型
             self.f_3d = ReconNetWrapper(net_recon="resnet50", use_last_fc=False)
@@ -108,10 +104,16 @@ class HifiFace:
         self.discriminator.to(device)
 
         if self.is_training:
+            self.l1_loss.to(device)
             self.f_3d.to(device)
             self.f_id.to(device)
+
             self.loss_fn_vgg.to(device)
             self.face_model.to(device)
+            self.adv_loss.to(device)
+            self.f_3d.requires_grad_(False)
+            self.f_id.requires_grad_(False)
+            self.loss_fn_vgg.requires_grad_(False)
             self.dilation_kernel = self.dilation_kernel.to(device)
             if self.use_ddp:
                 from torch.nn.parallel import DistributedDataParallel as DDP
