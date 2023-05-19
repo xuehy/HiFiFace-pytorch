@@ -12,7 +12,7 @@ class TrainConfig:
     mode = FaceSwapMode.MANY_TO_MANY
     source_name: str = ""
 
-    dataset_index: str = "/data/dataset/faceswap/large.pkl"
+    dataset_index: str = "/data/dataset/faceswap/full.pkl"
     dataset_root: str = "/data/dataset/faceswap"
 
     batch_size: int = 8
