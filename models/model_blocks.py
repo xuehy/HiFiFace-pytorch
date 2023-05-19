@@ -63,7 +63,7 @@ class AdaIn(nn.Module):
         mean_style = mean_style.unsqueeze(-1).unsqueeze(-1)
 
         x = F.instance_norm(x)
-        x = (1 + std_style) * x + mean_style
+        x = std_style * x + mean_style
         return x
 
 
@@ -111,9 +111,7 @@ class UpSamplingBlock(nn.Module):
         self,
     ):
         super(UpSamplingBlock, self).__init__()
-        self.net = nn.Sequential(
-            ResBlock(256, 256, up_sample=True), ResBlock(256, 256, up_sample=True), ResBlock(16, 16)
-        )
+        self.net = nn.Sequential(ResBlock(256, 256, up_sample=True), ResBlock(256, 256, up_sample=True))
         self.i_r_net = nn.Sequential(nn.LeakyReLU(0.2, inplace=True), nn.Conv2d(256, 3, 3, 1, 1))
         self.m_r_net = nn.Sequential(nn.Conv2d(256, 1, 3, 1, 1), nn.Sigmoid())
 
