@@ -1,24 +1,22 @@
 import argparse
 import os
-import uuid
 
 import cv2
 import kornia
 import numpy as np
 import torch
 from loguru import logger
-from torchaudio.io import StreamReader
-from torchaudio.io import StreamWriter
 
 from benchmark.face_pipeline import alignFace
 from benchmark.face_pipeline import FaceDetector
 from benchmark.face_pipeline import inverse_transform_batch
-from benchmark.face_pipeline import tensor2img
+from benchmark.face_pipeline import SoftErosion
 from configs.train_config import TrainConfig
+from data_process.model import BiSeNet
 from models.model import HifiFace
 
 
-class VideoSwap:
+class ImageSwap:
     def __init__(self, cfg):
         self.source_face = cfg.source_face
         self.target_face = cfg.target_face
@@ -47,6 +45,13 @@ class VideoSwap:
             + ".jpg"
         )
         self.swapped_image = os.path.join(self.work_dir, swapped_image_name)
+        self.smooth_mask = SoftErosion(kernel_size=7, threshold=0.9, iterations=7).to(self.device)
+        bisenet_path = cfg.bisenet_path
+        self.bisenet = BiSeNet(n_classes=19)
+        self.bisenet.to(self.device)
+        state_dict = torch.load(bisenet_path, map_location=self.device)
+        self.bisenet.load_state_dict(state_dict)
+        self.bisenet.eval()
 
     def _geometry_transfrom_warp_affine(self, swapped_image, inv_att_transforms, frame_size, square_mask):
         swapped_image = kornia.geometry.transform.warp_affine(
@@ -72,6 +77,9 @@ class VideoSwap:
 
     def detect_and_align(self, image):
         detection = self.facedetector(image)
+        if detection.score is None:
+            self.kps_window = []
+            return None, None
         max_score_ind = np.argmax(detection.score, axis=0)
         kps = detection.key_points[max_score_ind]
         align_img, warp_mat = self.alignface.align_face(image, kps, 256)
@@ -84,21 +92,28 @@ class VideoSwap:
     def inference(self):
         src = cv2.cvtColor(cv2.imread(self.source_face), cv2.COLOR_BGR2RGB)
         src, _ = self.detect_and_align(src)
+        if src is None:
+            print("no face in src_img")
+            return
         target = cv2.cvtColor(cv2.imread(self.target_face), cv2.COLOR_BGR2RGB)
         align_target, warp_mat = self.detect_and_align(target)
+        if align_target is None:
+            print("no face in target_img")
+            return
         logger.info("start swapping")
         frame_size = (target.shape[0], target.shape[1])
         with torch.no_grad():
             swapped_face = self.model.forward(src, align_target)
             swapped_face = torch.clamp(swapped_face, 0, 1)
+            face_mask, _ = self.bisenet.get_mask(swapped_face, swapped_face.shape[3])
+            smooth_face_mask, _ = self.smooth_mask(face_mask)
         warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
         inverse_warp_mat = inverse_transform_batch(warp_mat)
-        square_mask = torch.ones_like(swapped_face).cuda()
-        swapped_face, square_mask = self._geometry_transfrom_warp_affine(
-            swapped_face, inverse_warp_mat, frame_size, square_mask
+        swapped_face, smooth_face_mask = self._geometry_transfrom_warp_affine(
+            swapped_face, inverse_warp_mat, frame_size, smooth_face_mask
         )
         target = torch.from_numpy(target.transpose(2, 0, 1)).unsqueeze(0).to(self.device).float() / 255.0
-        result_face = (1 - square_mask) * target + square_mask * swapped_face
+        result_face = (1 - smooth_face_mask) * target + smooth_face_mask * swapped_face
         result_face = torch.clamp(result_face * 255.0, 0.0, 255.0, out=None).type(dtype=torch.uint8)
         result_face = result_face.detach().cpu().numpy()
         img = result_face.transpose(0, 2, 3, 1)[0]
@@ -111,6 +126,7 @@ class ConfigPath:
     target_face = ""
     work_dir = ""
     face_detector_weights = "/mnt/c/yangguo/useful_ckpt/face_detector/face_detector_scrfd_10g_bnkps.onnx"
+    bisenet_path = "/mnt/c/yangguo/useful_ckpt/face_parsing/parsing_model_79999_iter.pth"
     model_path = ""
     model_idx = 80000
 
@@ -132,7 +148,7 @@ def main():
     cfg.model_path = args.model_path
     cfg.model_idx = int(args.model_idx)
     cfg.work_dir = args.work_dir
-    infer = VideoSwap(cfg)
+    infer = ImageSwap(cfg)
     infer.inference()
 
 

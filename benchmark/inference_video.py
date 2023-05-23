@@ -1,6 +1,5 @@
 import argparse
 import os
-import uuid
 
 import cv2
 import kornia
@@ -13,8 +12,9 @@ from torchaudio.io import StreamWriter
 from benchmark.face_pipeline import alignFace
 from benchmark.face_pipeline import FaceDetector
 from benchmark.face_pipeline import inverse_transform_batch
-from benchmark.face_pipeline import tensor2img
+from benchmark.face_pipeline import SoftErosion
 from configs.train_config import TrainConfig
+from data_process.model import BiSeNet
 from models.model import HifiFace
 
 
@@ -70,6 +70,13 @@ class VideoSwap:
             "width": frame_width,
             "format": "rgb24",
         }
+        self.smooth_mask = SoftErosion(kernel_size=7, threshold=0.9, iterations=7).to(self.device)
+        bisenet_path = cfg.bisenet_path
+        self.bisenet = BiSeNet(n_classes=19)
+        self.bisenet.to(self.device)
+        state_dict = torch.load(bisenet_path, map_location=self.device)
+        self.bisenet.load_state_dict(state_dict)
+        self.bisenet.eval()
 
     def yuv_to_rgb(self, img):
         img = img.to(torch.float)
@@ -160,13 +167,14 @@ class VideoSwap:
                     with torch.no_grad():
                         swapped_face = self.model.forward(src, align_img)
                         swapped_face = torch.clamp(swapped_face, 0, 1)
+                        face_mask, _ = self.bisenet.get_mask(swapped_face, swapped_face.shape[3])
+                        smooth_face_mask, _ = self.smooth_mask(face_mask)
                     warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
                     inverse_warp_mat = inverse_transform_batch(warp_mat)
-                    square_mask = torch.ones_like(swapped_face).cuda()
-                    swapped_face, square_mask = self._geometry_transfrom_warp_affine(
-                        swapped_face, inverse_warp_mat, self.frame_size, square_mask
+                    swapped_face, smooth_face_mask = self._geometry_transfrom_warp_affine(
+                        swapped_face, inverse_warp_mat, self.frame_size, smooth_face_mask
                     )
-                    result_face = (1 - square_mask) * chunk + square_mask * swapped_face
+                    result_face = (1 - smooth_face_mask) * chunk + smooth_face_mask * swapped_face
                 result_face = torch.clamp(result_face * 255.0, 0.0, 255.0, out=None).type(dtype=torch.uint8)
                 sw.write_video_chunk(0, result_face)
 
@@ -184,6 +192,7 @@ class ConfigPath:
     target_video = ""
     work_dir = ""
     face_detector_weights = "/mnt/c/yangguo/useful_ckpt/face_detector/face_detector_scrfd_10g_bnkps.onnx"
+    bisenet_path = "/mnt/c/yangguo/useful_ckpt/face_parsing/parsing_model_79999_iter.pth"
     model_path = ""
     model_idx = 80000
 

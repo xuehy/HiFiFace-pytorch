@@ -5,9 +5,9 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from resnet import Resnet18
 
-from utils import encode_segmentation_rgb_batch
+from data_process.resnet import Resnet18
+from data_process.utils import encode_segmentation_rgb_batch
 
 
 class ConvBNReLU(nn.Module):
