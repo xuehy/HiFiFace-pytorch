@@ -81,9 +81,9 @@ def tensor2img(tensor):
     return img
 
 
-def inverse_transform_batch(mat: torch.Tensor) -> torch.Tensor:
+def inverse_transform_batch(mat: torch.Tensor, device="cuda") -> torch.Tensor:
     # inverse the Affine transformation matrix
-    inv_mat = torch.zeros_like(mat).cuda()
+    inv_mat = torch.zeros_like(mat).to(device)
     div1 = mat[:, 0, 0] * mat[:, 1, 1] - mat[:, 0, 1] * mat[:, 1, 0]
     inv_mat[:, 0, 0] = mat[:, 1, 1] / div1
     inv_mat[:, 0, 1] = -mat[:, 0, 1] / div1

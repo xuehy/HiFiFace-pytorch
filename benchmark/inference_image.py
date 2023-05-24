@@ -24,7 +24,7 @@ class ImageSwap:
         self.work_dir = cfg.work_dir
         opt = TrainConfig()
         opt.use_ddp = False
-        self.device = "cuda"
+        self.device = cfg.device
         checkpoint = (cfg.model_path, cfg.model_idx)
         self.model = HifiFace(
             opt.identity_extractor_config, is_training=False, device=self.device, load_checkpoint=checkpoint
@@ -100,7 +100,7 @@ class ImageSwap:
             swapped_face = torch.clamp(swapped_face, 0, 1)
             smooth_face_mask, _ = self.smooth_mask(m_r)
         warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
-        inverse_warp_mat = inverse_transform_batch(warp_mat)
+        inverse_warp_mat = inverse_transform_batch(warp_mat, device=self.device)
         swapped_face, smooth_face_mask = self._geometry_transfrom_warp_affine(
             swapped_face, inverse_warp_mat, frame_size, smooth_face_mask
         )
@@ -120,6 +120,7 @@ class ConfigPath:
     face_detector_weights = "/mnt/c/yangguo/useful_ckpt/face_detector/face_detector_scrfd_10g_bnkps.onnx"
     model_path = ""
     model_idx = 80000
+    device = "cuda"
 
 
 def main():
@@ -132,6 +133,7 @@ def main():
     parser.add_argument("-s", "--source_face")
     parser.add_argument("-t", "--target_face")
     parser.add_argument("-w", "--work_dir")
+    parser.add_argument("-d", "--device", default="cuda")
 
     args = parser.parse_args()
     cfg.source_face = args.source_face
@@ -139,6 +141,7 @@ def main():
     cfg.model_path = args.model_path
     cfg.model_idx = int(args.model_idx)
     cfg.work_dir = args.work_dir
+    cfg.device = args.device
     infer = ImageSwap(cfg)
     infer.inference()
 
