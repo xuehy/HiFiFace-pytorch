@@ -330,8 +330,8 @@ class HifiFace:
         --------
         i_r: torch.Tensor, swapped result
         """
-        i_r, _, _, _ = self.generator(source_img, target_img)
-        return i_r
+        i_r, _, m_r, _ = self.generator(source_img, target_img)
+        return i_r, m_r
 
     def optimize(
         self,

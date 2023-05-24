@@ -12,7 +12,6 @@ from benchmark.face_pipeline import FaceDetector
 from benchmark.face_pipeline import inverse_transform_batch
 from benchmark.face_pipeline import SoftErosion
 from configs.train_config import TrainConfig
-from data_process.model import BiSeNet
 from models.model import HifiFace
 
 
@@ -46,12 +45,6 @@ class ImageSwap:
         )
         self.swapped_image = os.path.join(self.work_dir, swapped_image_name)
         self.smooth_mask = SoftErosion(kernel_size=7, threshold=0.9, iterations=7).to(self.device)
-        bisenet_path = cfg.bisenet_path
-        self.bisenet = BiSeNet(n_classes=19)
-        self.bisenet.to(self.device)
-        state_dict = torch.load(bisenet_path, map_location=self.device)
-        self.bisenet.load_state_dict(state_dict)
-        self.bisenet.eval()
 
     def _geometry_transfrom_warp_affine(self, swapped_image, inv_att_transforms, frame_size, square_mask):
         swapped_image = kornia.geometry.transform.warp_affine(
@@ -103,10 +96,9 @@ class ImageSwap:
         logger.info("start swapping")
         frame_size = (target.shape[0], target.shape[1])
         with torch.no_grad():
-            swapped_face = self.model.forward(src, align_target)
+            swapped_face, m_r = self.model.forward(src, align_target)
             swapped_face = torch.clamp(swapped_face, 0, 1)
-            face_mask, _ = self.bisenet.get_mask(swapped_face, swapped_face.shape[3])
-            smooth_face_mask, _ = self.smooth_mask(face_mask)
+            smooth_face_mask, _ = self.smooth_mask(m_r)
         warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
         inverse_warp_mat = inverse_transform_batch(warp_mat)
         swapped_face, smooth_face_mask = self._geometry_transfrom_warp_affine(
@@ -126,7 +118,6 @@ class ConfigPath:
     target_face = ""
     work_dir = ""
     face_detector_weights = "/mnt/c/yangguo/useful_ckpt/face_detector/face_detector_scrfd_10g_bnkps.onnx"
-    bisenet_path = "/mnt/c/yangguo/useful_ckpt/face_parsing/parsing_model_79999_iter.pth"
     model_path = ""
     model_idx = 80000
 
