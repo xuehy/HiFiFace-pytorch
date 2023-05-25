@@ -9,8 +9,9 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-from insightface.model_zoo import model_zoo
 from skimage import transform as skt
+
+from .scrfd_detect import SCRFD
 
 # ---frontal
 src = np.array(
@@ -63,7 +64,7 @@ class FaceDetector:
         self.det_thresh = det_thresh
         self.mode = mode
         self.device = device
-        self.handler = model_zoo.get_model(str(model_path))
+        self.handler = SCRFD(str(model_path), device=self.device, det_thresh=det_thresh)
         ctx_id = -1 if device == "cpu" else 0
         self.handler.prepare(ctx_id, input_size=det_size)
 

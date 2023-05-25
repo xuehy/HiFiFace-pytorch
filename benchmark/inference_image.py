@@ -19,12 +19,12 @@ class ImageSwap:
     def __init__(self, cfg):
         self.source_face = cfg.source_face
         self.target_face = cfg.target_face
-        self.facedetector = FaceDetector(cfg.face_detector_weights)
+        self.device = cfg.device
+        self.facedetector = FaceDetector(cfg.face_detector_weights, device=self.device)
         self.alignface = alignFace()
         self.work_dir = cfg.work_dir
         opt = TrainConfig()
         opt.use_ddp = False
-        self.device = cfg.device
         checkpoint = (cfg.model_path, cfg.model_idx)
         self.model = HifiFace(
             opt.identity_extractor_config, is_training=False, device=self.device, load_checkpoint=checkpoint
