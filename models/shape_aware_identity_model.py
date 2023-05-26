@@ -33,6 +33,22 @@ class ShapeAwareIdentityExtractor(nn.Module):
         self.f_id.load_state_dict(torch.load(f_id_checkpoint_path, map_location="cpu"))
         self.f_id.eval()
 
+    @torch.no_grad()
+    def interp(self, i_source, i_target, rate=1.0):
+        """
+        插值shape id信息
+        """
+        c_s = self.f_3d(i_source)
+        c_t = self.f_3d(i_target)
+        c_interp = rate * c_s + (1 - rate) * c_t
+        c_fuse = torch.cat((c_interp[:, :80], c_t[:, 80:]), dim=1)
+        # extract source face identity feature
+        v_id = F.normalize(self.f_id(F.interpolate((i_source - 0.5) / 0.5, size=112, mode="bicubic")), dim=-1, p=2)
+
+        # concat new shape feature and source identity
+        v_sid = torch.cat((c_fuse, v_id), dim=1)
+        return v_sid
+
     def forward(self, i_source, i_target):
         """
         Parameters:

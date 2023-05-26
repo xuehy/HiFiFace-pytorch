@@ -69,7 +69,7 @@ class ImageSwap:
         align_img = align_img / 255.0
         return align_img, warp_mat
 
-    def inference(self, source_face, target_face):
+    def inference(self, source_face, target_face, rate):
         src = source_face
         src, _ = self.detect_and_align(src)
         if src is None:
@@ -83,7 +83,7 @@ class ImageSwap:
         logger.info("start swapping")
         frame_size = (target.shape[0], target.shape[1])
         with torch.no_grad():
-            swapped_face, m_r = self.model.forward(src, align_target)
+            swapped_face, m_r = self.model.forward(src, align_target, rate)
             swapped_face = torch.clamp(swapped_face, 0, 1)
             smooth_face_mask, _ = self.smooth_mask(m_r)
         warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
@@ -124,13 +124,17 @@ def main():
     cfg.device = args.device
     infer = ImageSwap(cfg)
 
-    def inference(source_face, target_face):
-        return infer.inference(source_face, target_face)
+    def inference(source_face, target_face, rate):
+        return infer.inference(source_face, target_face, rate)
 
     output = gr.Image(shape=None, label="换脸结果")
     demo = gr.Interface(
         fn=inference,
-        inputs=[gr.Image(shape=None, label="选脸图"), gr.Image(shape=None, label="目标图")],
+        inputs=[
+            gr.Image(shape=None, label="选脸图"),
+            gr.Image(shape=None, label="目标图"),
+            gr.Slider(0.0, 1.0, 1.0, 0.1, label="选脸图浓度（1.0表示完全替换）"),
+        ],
         outputs=output,
         title="HiConFace换脸",
     )
