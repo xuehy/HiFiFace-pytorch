@@ -133,7 +133,13 @@ def main():
         inputs=[
             gr.Image(shape=None, label="选脸图"),
             gr.Image(shape=None, label="目标图"),
-            gr.Slider(0.0, 1.0, 1.0, 0.1, label="选脸图浓度（1.0表示完全替换）"),
+            gr.Slider(
+                minimum=0.0,
+                maximum=1.0,
+                value=1.0,
+                step=0.1,
+                label="选脸图浓度（1.0表示完全替换）",
+            ),
         ],
         outputs=output,
         title="HiConFace换脸",
