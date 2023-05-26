@@ -22,8 +22,10 @@ class TrainConfig:
     grad_clip: float = 1000.0
 
     use_ddp: bool = True
+
     mouse_mask: bool = True
     eye_hm_loss: bool = False
+
     load_checkpoint = None  # ("/data/checkpoints/hififace/rebuilt_discriminator_SFF_c256_1683367464544", 400000)
 
     identity_extractor_config = {
@@ -38,7 +40,7 @@ class TrainConfig:
     max_iters: int = 1000000
     checkpoint_interval: int = 40000
 
-    exp_name: str = "exp_rsff_msd"
+    exp_name: str = "exp_base"
     log_basedir: str = "/data/logs/hififace/"
     checkpoint_basedir = "/data/checkpoints/hififace"
 
