@@ -124,8 +124,8 @@ def main():
     cfg.device = args.device
     infer = ImageSwap(cfg)
 
-    def inference(source_face, target_face, rate):
-        return infer.inference(source_face, target_face, rate)
+    def inference(source_face, target_face, shape_rate, id_rate):
+        return infer.inference(source_face, target_face, shape_rate, id_rate)
 
     output = gr.Image(shape=None, label="换脸结果")
     demo = gr.Interface(
@@ -138,7 +138,14 @@ def main():
                 maximum=1.0,
                 value=1.0,
                 step=0.1,
-                label="选脸图浓度（1.0表示完全替换）",
+                label="3d结构相似度（1.0表示完全替换）",
+            ),
+            gr.Slider(
+                minimum=0.0,
+                maximum=1.0,
+                value=1.0,
+                step=0.1,
+                label="人脸特征相似度（1.0表示完全替换）",
             ),
         ],
         outputs=output,

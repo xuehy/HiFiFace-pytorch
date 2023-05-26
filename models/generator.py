@@ -84,8 +84,8 @@ class Generator(nn.Module):
         self.sff_module = init_net(SemanticFaceFusionModule())
 
     @torch.no_grad()
-    def interp(self, i_source, i_target, rate=1.0):
-        shape_aware_id_vector = self.id_extractor.interp(i_source, i_target, rate)
+    def interp(self, i_source, i_target, shape_rate=1.0, id_rate=1.0):
+        shape_aware_id_vector = self.id_extractor.interp(i_source, i_target, shape_rate, id_rate)
         z_enc, x = self.encoder(i_target)
         z_dec = self.decoder(x, shape_aware_id_vector)
 

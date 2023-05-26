@@ -315,21 +315,27 @@ class HifiFace:
             "loss_discriminator": loss_discriminator,
         }
 
-    def forward(self, source_img: torch.Tensor, target_img: torch.Tensor, rate=None) -> torch.Tensor:
+    def forward(
+        self, source_img: torch.Tensor, target_img: torch.Tensor, shape_rate=None, id_rate=None
+    ) -> torch.Tensor:
         """
         Parameters:
         -----------
         source_img: torch.Tensor, source face 图像
         target_img: torch.Tensor, target face 图像
-        rate: 插值系数
+        *_rate: 插值系数
         Returns:
         --------
         i_r: torch.Tensor, swapped result
         """
-        if rate is None:
+        if shape_rate is None and id_rate is None:
             i_r, _, m_r, _ = self.generator(source_img, target_img)
         else:
-            i_r, _, m_r, _ = self.generator.interp(source_img, target_img, rate)
+            if shape_rate is None:
+                shape_rate = 1.0
+            if id_rate is None:
+                id_rate = 1.0
+            i_r, _, m_r, _ = self.generator.interp(source_img, target_img, shape_rate, id_rate)
         return i_r, m_r
 
     def optimize(
