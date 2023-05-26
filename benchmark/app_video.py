@@ -112,7 +112,7 @@ class VideoSwap:
             self.kps_window = []
         return align_img, warp_mat
 
-    def inference(self, source_face, target_video):
+    def inference(self, source_face, target_video, shape_rate, id_rate):
         video = cv2.VideoCapture(target_video)
         # 获取视频宽度
         frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -150,7 +150,7 @@ class VideoSwap:
                     result_face = chunk
                 else:
                     with torch.no_grad():
-                        swapped_face, m_r = self.model.forward(src, align_img)
+                        swapped_face, m_r = self.model.forward(src, align_img, shape_rate, id_rate)
                         swapped_face = torch.clamp(swapped_face, 0, 1)
                         smooth_face_mask, _ = self.smooth_mask(m_r)
                     warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
@@ -193,13 +193,30 @@ def main():
 
     infer = VideoSwap(cfg)
 
-    def inference(source_face, target_video):
-        return infer.inference(source_face, target_video)
+    def inference(source_face, target_video, shape_rate, id_rate):
+        return infer.inference(source_face, target_video, shape_rate, id_rate)
 
     output = gr.Video(value=None, label="换脸结果")
     demo = gr.Interface(
         fn=inference,
-        inputs=[gr.Image(shape=None, label="选脸图"), gr.Video(value=None, label="目标视频")],
+        inputs=[
+            gr.Image(shape=None, label="选脸图"),
+            gr.Video(value=None, label="目标视频"),
+            gr.Slider(
+                minimum=0.0,
+                maximum=1.0,
+                value=1.0,
+                step=0.1,
+                label="3d结构相似度（1.0表示完全替换）",
+            ),
+            gr.Slider(
+                minimum=0.0,
+                maximum=1.0,
+                value=1.0,
+                step=0.1,
+                label="人脸特征相似度（1.0表示完全替换）",
+            ),
+        ],
         outputs=output,
         title="HiConFace视频换脸",
     )
