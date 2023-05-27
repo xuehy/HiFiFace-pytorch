@@ -16,6 +16,7 @@ from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
 from Deep3DFaceRecon_pytorch.models.networks import ReconNetWrapper
+from HRNet.hrnet import HighResolutionNet
 from models.discriminator import Discriminator
 from models.gan_loss import GANLoss
 from models.generator import Generator
@@ -42,7 +43,7 @@ class HifiFace:
 
         if self.is_training:
             self.l1_loss = nn.L1Loss()
-            if TrainConfig().eye_hm_loss:
+            if TrainConfig().eye_hm_loss or TrainConfig().mouth_hm_loss:
                 self.mse_loss = nn.MSELoss()
             self.loss_fn_vgg = lpips.LPIPS(net="vgg")
             self.adv_loss = GANLoss()
@@ -72,6 +73,13 @@ class HifiFace:
                 self.model_ft.load_state_dict(model_weights)
                 self.model_ft.eval()
 
+            # mouth heatmap model
+            if TrainConfig().mouth_hm_loss:
+                self.model_mouth = HighResolutionNet()
+                checkpoint = torch.load(identity_extractor_config["hrnet_path"], map_location="cpu")
+                self.model_mouth.load_state_dict(checkpoint)
+                self.model_mouth.eval()
+
             self.lambda_adv = 1
             self.lambda_seg = 100
             self.lambda_rec = 20
@@ -80,7 +88,8 @@ class HifiFace:
 
             self.lambda_shape = 0.5
             self.lambda_id = 5
-            self.lambda_eye_hm = 1200.0
+            self.lambda_eye_hm = 10000.0
+            self.lambda_mouth_hm = 10000.0
 
             self.dilation_kernel = torch.ones(5, 5)
 
@@ -121,7 +130,7 @@ class HifiFace:
 
         if self.is_training:
             self.l1_loss.to(device)
-            if TrainConfig().eye_hm_loss:
+            if TrainConfig().eye_hm_loss or TrainConfig().mouth_hm_loss:
                 self.mse_loss.to(device)
             self.f_3d.to(device)
             self.f_id.to(device)
@@ -131,12 +140,15 @@ class HifiFace:
             self.adv_loss.to(device)
             if TrainConfig().eye_hm_loss:
                 self.model_ft.to(device)
+            if TrainConfig().mouth_hm_loss:
+                self.model_mouth.to(device)
             self.f_3d.requires_grad_(False)
             self.f_id.requires_grad_(False)
             self.loss_fn_vgg.requires_grad_(False)
             if TrainConfig().eye_hm_loss:
                 self.model_ft.requires_grad_(False)
-
+            if TrainConfig().mouth_hm_loss:
+                self.model_mouth.requires_grad_(False)
             self.dilation_kernel = self.dilation_kernel.to(device)
             if self.use_ddp:
                 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -260,6 +272,14 @@ class HifiFace:
 
             loss_realism = loss_realism + self.lambda_eye_hm * loss_eye_hm
 
+        # mouth hm loss
+        loss_mouth_hm = 0
+        if TrainConfig().mouth_hm_loss:
+            target_mouth_hm = self.model_mouth(target_img)[:, 76:96, :, :]
+            r_mouth_hm = self.model_mouth(i_r)[:, 76:96, :, :]
+            loss_mouth_hm = self.mse_loss(r_mouth_hm, target_mouth_hm)
+            loss_realism = loss_realism + self.lambda_mouth_hm * loss_mouth_hm
+
         loss_generator = loss_sid + loss_realism
 
         loss_dict = {
@@ -276,6 +296,8 @@ class HifiFace:
         }
         if TrainConfig().eye_hm_loss:
             loss_dict.update({"loss_eye_hm": loss_eye_hm})
+        if TrainConfig().mouth_hm_loss:
+            loss_dict.update({"loss_mouth_hm": loss_mouth_hm})
         return (
             source_img,
             target_img,
