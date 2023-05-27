@@ -23,7 +23,7 @@ class TrainConfig:
 
     use_ddp: bool = True
 
-    mouse_mask: bool = True
+    mouth_mask: bool = True
     eye_hm_loss: bool = False
     mouth_hm_loss: bool = False
 

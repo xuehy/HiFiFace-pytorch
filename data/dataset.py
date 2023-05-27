@@ -45,7 +45,7 @@ class ManyToManyTrainDataset(Dataset):
         self.length = len(self.id_list)
         self.image_num = sum([len(v) for v in self.file_index.values()])
 
-        self.mask_dir = "mask" if TrainConfig.mouse_mask else "mask_no_mouth"
+        self.mask_dir = "mask" if TrainConfig().mouth_mask else "mask_no_mouth"
         logger.info(f"dataset contains {self.length} ids and {self.image_num} images")
         logger.info(f"will use mask mode: {self.mask_dir}")
 
@@ -124,7 +124,7 @@ class OneToManyTrainDataset(Dataset):
         # 所有id都遍历一遍，视为一个epoch
         self.length = len(self.id_list)
         self.image_num = sum([len(v) for v in self.file_index.values()])
-        self.mask_dir = "mask" if TrainConfig.mouse_mask else "mask_no_mouth"
+        self.mask_dir = "mask" if TrainConfig().mouth_mask else "mask_no_mouth"
         logger.info(f"dataset contains {self.length} ids and {self.image_num} images")
         logger.info(f"will use mask mode: {self.mask_dir}")
 
