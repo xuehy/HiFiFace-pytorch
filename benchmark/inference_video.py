@@ -79,7 +79,7 @@ class VideoSwap:
                 "format": "yuv444p",
             }
         else:
-            self.decode_config = {"frames_per_chunk": 1, "decoder": "h264"}
+            self.decode_config = {"frames_per_chunk": 1, "decoder": "h264", "format": "yuv444p"}
 
             self.encode_config = {
                 "encoder": "libx264",
@@ -175,7 +175,10 @@ class VideoSwap:
         src, _ = self.detect_and_align(src, src_is=True)
         logger.info("start swapping")
         sr = StreamReader(self.target_video)
-        sr.add_video_stream(**self.decode_config)
+        if self.ffmpeg_device == "cpu":
+            sr.add_basic_video_stream(**self.decode_config)
+        else:
+            sr.add_video_stream(**self.decode_config)
         sw = StreamWriter(self.swapped_video)
         sw.add_video_stream(**self.encode_config)
         with sw.open():
@@ -198,8 +201,8 @@ class VideoSwap:
                         swapped_face, inverse_warp_mat, self.frame_size, smooth_face_mask
                     )
                     result_face = (1 - smooth_face_mask) * chunk + smooth_face_mask * swapped_face
-                result_face = self.rgb_to_yuv(result_face).to(self.ffmpeg_device)
-                sw.write_video_chunk(0, result_face)
+                result_face = self.rgb_to_yuv(result_face)
+                sw.write_video_chunk(0, result_face.to(self.ffmpeg_device))
 
         # 将target_video中的音频转移到换脸视频上
         command = f"ffmpeg -loglevel error -i {self.swapped_video} -i {self.target_video} -c copy \
