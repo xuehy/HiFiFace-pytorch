@@ -26,6 +26,7 @@ class VideoSwap:
         opt = TrainConfig()
         opt.use_ddp = False
         self.device = "cuda"
+        self.ffmpeg_device = cfg.ffmpeg_device
         self.num_frames = 10
         self.kps_window = []
         checkpoint = (cfg.model_path, cfg.model_idx)
@@ -60,6 +61,16 @@ class VideoSwap:
 
         rgb = torch.stack([r, g, b], -1)
         return rgb
+
+    def rgb_to_yuv(self, img):
+        r = img[..., 0, :, :]
+        g = img[..., 1, :, :]
+        b = img[..., 2, :, :]
+        y = (0.299 * r + 0.587 * g + 0.114 * b) * 255
+        u = (-0.1471 * r - 0.2889 * g + 0.4360 * b) * 255 + 128
+        v = (0.6149 * r - 0.5149 * g - 0.1 * b) * 255 + 128
+        yuv = torch.stack([y, u, v], -1)
+        return torch.clamp(yuv, 0.0, 255.0, out=None).type(dtype=torch.uint8).transpose(3, 2).transpose(2, 1)
 
     def _geometry_transfrom_warp_affine(self, swapped_image, inv_att_transforms, frame_size, square_mask):
         swapped_image = kornia.geometry.transform.warp_affine(
@@ -122,21 +133,40 @@ class VideoSwap:
         frame_rate = int(video.get(cv2.CAP_PROP_FPS))
         video.release()
         self.frame_size = (frame_height, frame_width)
-        self.encode_config = {
-            "encoder": "h264_nvenc",  # GPU Encoder
-            "encoder_format": "rgb0",
-            "encoder_option": {"gpu": "0"},  # Run encoding on the cuda:0 device
-            "hw_accel": "cuda:0",  # Data comes from cuda:0 device
-            "frame_rate": frame_rate,
-            "height": frame_height,
-            "width": frame_width,
-            "format": "rgb24",
-        }
+        if self.ffmpeg_device == "cuda":
+            self.decode_config = {
+                "frames_per_chunk": 1,
+                "decoder": "h264_cuvid",
+                "decoder_option": {"gpu": "0"},
+                "hw_accel": "cuda:0",
+            }
+
+            self.encode_config = {
+                "encoder": "h264_nvenc",  # GPU Encoder
+                "encoder_format": "yuv444p",
+                "encoder_option": {"gpu": "0"},  # Run encoding on the cuda:0 device
+                "hw_accel": "cuda:0",  # Data comes from cuda:0 device
+                "frame_rate": frame_rate,
+                "height": frame_height,
+                "width": frame_width,
+                "format": "yuv444p",
+            }
+        else:
+            self.decode_config = {"frames_per_chunk": 1, "decoder": "h264"}
+
+            self.encode_config = {
+                "encoder": "libx264",
+                "encoder_format": "yuv444p",
+                "frame_rate": frame_rate,
+                "height": frame_height,
+                "width": frame_width,
+                "format": "yuv444p",
+            }
         src = source_face
         src, _ = self.detect_and_align(src, src_is=True)
         logger.info("start swapping")
         sr = StreamReader(target_video)
-        sr.add_video_stream(frames_per_chunk=1, decoder="h264_cuvid", decoder_option={"gpu": "0"}, hw_accel="cuda:0")
+        sr.add_video_stream(**self.decode_config)
         sw = StreamWriter(self.swapped_video)
         sw.add_video_stream(**self.encode_config)
         with sw.open():
@@ -145,7 +175,7 @@ class VideoSwap:
                 chunk = self.yuv_to_rgb(chunk)
                 image = (chunk * 255).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
                 align_img, warp_mat = self.detect_and_align(image)
-                chunk = chunk.transpose(3, 2).transpose(2, 1)
+                chunk = chunk.transpose(3, 2).transpose(2, 1).to(self.device)
                 if align_img is None:
                     result_face = chunk
                 else:
@@ -159,7 +189,7 @@ class VideoSwap:
                         swapped_face, inverse_warp_mat, self.frame_size, smooth_face_mask
                     )
                     result_face = (1 - smooth_face_mask) * chunk + smooth_face_mask * swapped_face
-                result_face = torch.clamp(result_face * 255.0, 0.0, 255.0, out=None).type(dtype=torch.uint8)
+                result_face = self.rgb_to_yuv(result_face).to(self.ffmpeg_device)
                 sw.write_video_chunk(0, result_face)
 
         # 将target_video中的音频转移到换脸视频上
@@ -176,6 +206,7 @@ class ConfigPath:
     face_detector_weights = "/mnt/c/yangguo/useful_ckpt/face_detector/face_detector_scrfd_10g_bnkps.onnx"
     model_path = ""
     model_idx = 80000
+    ffmpeg_device = "cuda"
 
 
 def main():
@@ -185,11 +216,13 @@ def main():
     )
     parser.add_argument("-m", "--model_path")
     parser.add_argument("-i", "--model_idx")
+    parser.add_argument("-f", "--ffmpeg_device")
 
     args = parser.parse_args()
 
     cfg.model_path = args.model_path
     cfg.model_idx = int(args.model_idx)
+    cfg.ffmpeg_device = args.ffmpeg_device
 
     infer = VideoSwap(cfg)
 
