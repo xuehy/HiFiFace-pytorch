@@ -25,6 +25,7 @@ class TrainConfig:
 
     mouth_mask: bool = True
     eye_hm_loss: bool = False
+    mouth_hm_loss: bool = False
 
     load_checkpoint = None  # ("/data/checkpoints/hififace/rebuilt_discriminator_SFF_c256_1683367464544", 400000)
 
@@ -33,6 +34,7 @@ class TrainConfig:
         "f_id_checkpoint_path": "/data/useful_ckpt/arcface/ms1mv3_arcface_r100_fp16_backbone.pth",
         "bfm_folder": "/data/useful_ckpt/BFM",
         "model_ft_path": "/data/useful_ckpt/AWL_detector/WFLW_4HG.pth",
+        "hrnet_path": "/data/useful_ckpt/face_98lmks/HR18-WFLW.pth",
     }
 
     visualize_interval: int = 100
