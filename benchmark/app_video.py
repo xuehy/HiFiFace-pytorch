@@ -254,7 +254,8 @@ def main():
             ),
         ],
         outputs=output,
-        title="HiConFace视频换脸",
+        title="HiConFace视频人脸融合系统",
+        description="v1.0: developed by yiwise CV group",
     )
     demo.launch(server_name="0.0.0.0", server_port=7860)
 
