@@ -10,8 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from loguru import logger
 
-from AdaptiveWingLoss.aux import detect_landmarks
-from AdaptiveWingLoss.core import models
 from arcface_torch.backbones.iresnet import iresnet100
 from configs.train_config import TrainConfig
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
@@ -62,19 +60,8 @@ class HifiFace:
             self.f_id.load_state_dict(torch.load(identity_extractor_config["f_id_checkpoint_path"], map_location="cpu"))
             self.f_id.eval()
 
-            # eye heatmap model
-            if TrainConfig().eye_hm_loss:
-                self.model_ft = models.FAN(4, "False", "False", 98)
-                checkpoint = torch.load(identity_extractor_config["model_ft_path"], map_location="cpu")
-                pretrained_weights = checkpoint["state_dict"]
-                model_weights = self.model_ft.state_dict()
-                pretrained_weights = {k: v for k, v in pretrained_weights.items() if k in model_weights}
-                model_weights.update(pretrained_weights)
-                self.model_ft.load_state_dict(model_weights)
-                self.model_ft.eval()
-
             # mouth heatmap model
-            if TrainConfig().mouth_hm_loss:
+            if TrainConfig().mouth_hm_loss or TrainConfig().eye_hm_loss:
                 self.model_mouth = HighResolutionNet()
                 checkpoint = torch.load(identity_extractor_config["hrnet_path"], map_location="cpu")
                 self.model_mouth.load_state_dict(checkpoint)
@@ -138,16 +125,13 @@ class HifiFace:
             self.loss_fn_vgg.to(device)
             self.face_model.to(device)
             self.adv_loss.to(device)
-            if TrainConfig().eye_hm_loss:
-                self.model_ft.to(device)
-            if TrainConfig().mouth_hm_loss:
+
+            if TrainConfig().mouth_hm_loss or TrainConfig().eye_hm_loss:
                 self.model_mouth.to(device)
             self.f_3d.requires_grad_(False)
             self.f_id.requires_grad_(False)
             self.loss_fn_vgg.requires_grad_(False)
-            if TrainConfig().eye_hm_loss:
-                self.model_ft.requires_grad_(False)
-            if TrainConfig().mouth_hm_loss:
+            if TrainConfig().mouth_hm_loss or TrainConfig().eye_hm_loss:
                 self.model_mouth.requires_grad_(False)
             self.dilation_kernel = self.dilation_kernel.to(device)
             if self.use_ddp:
@@ -263,22 +247,23 @@ class HifiFace:
 
         # eye hm loss
         loss_eye_hm = 0
-        if TrainConfig().eye_hm_loss:
-            target_heatmap_left, target_heatmap_right = detect_landmarks(target_img, self.model_ft)
-            r_heatmap_left, r_heatmap_right = detect_landmarks(i_r, self.model_ft)
-            loss_eye_hm = self.mse_loss(r_heatmap_left, target_heatmap_left) + self.mse_loss(
-                r_heatmap_right, target_heatmap_right
-            )
-
-            loss_realism = loss_realism + self.lambda_eye_hm * loss_eye_hm
-
         # mouth hm loss
         loss_mouth_hm = 0
-        if TrainConfig().mouth_hm_loss:
-            target_mouth_hm = self.model_mouth(target_img)[:, 76:96, :, :]
-            r_mouth_hm = self.model_mouth(i_r)[:, 76:96, :, :]
-            loss_mouth_hm = self.mse_loss(r_mouth_hm, target_mouth_hm)
-            loss_realism = loss_realism + self.lambda_mouth_hm * loss_mouth_hm
+        if TrainConfig().eye_hm_loss or TrainConfig().mouth_hm_loss:
+            target_hm = self.model_mouth(target_img)
+            r_hm = self.model_mouth(i_r)
+
+            if TrainConfig().eye_hm_loss:
+                target_eye_hm = target_hm[:, 96:98, :, :]
+                r_eye_hm = r_hm[:, 96:98, :, :]
+                loss_eye_hm = self.mse_loss(r_eye_hm, target_eye_hm)
+                loss_realism = loss_realism + self.lambda_eye_hm * loss_eye_hm
+
+            if TrainConfig().mouth_hm_loss:
+                target_mouth_hm = target_hm[:, 76:96, :, :]
+                r_mouth_hm = r_hm[:, 76:96, :, :]
+                loss_mouth_hm = self.mse_loss(r_mouth_hm, target_mouth_hm)
+                loss_realism = loss_realism + self.lambda_mouth_hm * loss_mouth_hm
 
         loss_generator = loss_sid + loss_realism
 
