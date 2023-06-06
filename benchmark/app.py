@@ -1,9 +1,9 @@
 import argparse
 
 import gradio as gr
-from app_image import ImageSwap
-from app_video import VideoSwap
 
+from benchmark.app_image import ImageSwap
+from benchmark.app_video import VideoSwap
 from configs.train_config import TrainConfig
 from models.model import HifiFace
 
