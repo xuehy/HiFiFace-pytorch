@@ -33,7 +33,7 @@ def main():
     cfg.ffmpeg_device = args.ffmpeg_device
     cfg.device = args.device
     opt = TrainConfig()
-    checkpoint = (cfg.model_path, cfg.model_id)
+    checkpoint = (cfg.model_path, cfg.model_idx)
     model = HifiFace(opt.identity_extractor_config, is_training=False, device=cfg.device, load_checkpoint=checkpoint)
 
     image_infer = ImageSwap(cfg, model)
