@@ -45,7 +45,7 @@ def main():
     def inference_video(source_face, target_video, shape_rate, id_rate):
         return video_infer.inference(source_face, target_video, shape_rate, id_rate)
 
-    with gr.Blocks(title="dd") as demo:
+    with gr.Blocks(title="高属性一致人脸融合系统") as demo:
         gr.Markdown(
             """
         # HiConFace人脸融合系统
@@ -53,23 +53,28 @@ def main():
         """
         )
         with gr.Tab("图片换脸"):
-            source_image = gr.Image(shape=None, label="选脸图")
-            target_image = gr.Image(shape=None, label="目标图")
-            structure_sim = gr.Slider(
-                minimum=0.0,
-                maximum=1.0,
-                value=1.0,
-                step=0.1,
-                label="3d结构相似度（1.0表示最接近选脸图）",
-            )
-            id_sim = gr.Slider(
-                minimum=0.0,
-                maximum=1.0,
-                value=1.0,
-                step=0.1,
-                label="人脸特征相似度",
-            )
-            image_btn = gr.Button("图像换脸")
+            with gr.Row():
+                source_image = gr.Image(shape=None, label="选脸图")
+                target_image = gr.Image(shape=None, label="目标图")
+            with gr.Row():
+                with gr.Column():
+                    structure_sim = gr.Slider(
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=1.0,
+                        step=0.1,
+                        label="3d结构相似度（1.0表示最接近选脸图）",
+                    )
+                    id_sim = gr.Slider(
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=1.0,
+                        step=0.1,
+                        label="人脸特征相似度",
+                    )
+                    image_btn = gr.Button("图像换脸")
+                output_image = gr.Image(shape=None, label="换脸结果")
+
             image_btn.click(
                 fn=inference_image,
                 inputs=[
@@ -78,7 +83,7 @@ def main():
                     structure_sim,
                     id_sim,
                 ],
-                outputs=gr.Image(shape=None, label="换脸结果"),
+                outputs=output_image,
             )
 
         with gr.Tab("视频换脸"):
