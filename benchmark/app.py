@@ -87,23 +87,28 @@ def main():
             )
 
         with gr.Tab("视频换脸"):
-            source_image = gr.Image(shape=None, label="选脸图")
-            target_video = gr.Video(value=None, label="目标视频")
-            structure_sim = gr.Slider(
-                minimum=0.0,
-                maximum=1.0,
-                value=1.0,
-                step=0.1,
-                label="3d结构相似度（1.0表示最接近选脸图）",
-            )
-            id_sim = gr.Slider(
-                minimum=0.0,
-                maximum=1.0,
-                value=1.0,
-                step=0.1,
-                label="人脸特征相似度",
-            )
-            video_btn = gr.Button("视频换脸")
+            with gr.Row():
+                source_image = gr.Image(shape=None, label="选脸图")
+                target_video = gr.Video(value=None, label="目标视频")
+            with gr.Row():
+                with gr.Column():
+                    structure_sim = gr.Slider(
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=1.0,
+                        step=0.1,
+                        label="3d结构相似度（1.0表示最接近选脸图）",
+                    )
+                    id_sim = gr.Slider(
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=1.0,
+                        step=0.1,
+                        label="人脸特征相似度",
+                    )
+                    video_btn = gr.Button("视频换脸")
+                output_video = gr.Video(value=None, label="换脸结果")
+
             video_btn.click(
                 fn=inference_video,
                 inputs=[
@@ -112,7 +117,7 @@ def main():
                     structure_sim,
                     id_sim,
                 ],
-                outputs=gr.Video(value=None, label="换脸结果"),
+                outputs=output_video,
             )
 
     demo.launch(server_name="0.0.0.0", server_port=7860)
