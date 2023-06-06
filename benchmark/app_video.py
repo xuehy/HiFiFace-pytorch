@@ -1,5 +1,6 @@
 import argparse
 import os
+import uuid
 
 import cv2
 import gradio as gr
@@ -19,7 +20,7 @@ from models.model import HifiFace
 
 
 class VideoSwap:
-    def __init__(self, cfg):
+    def __init__(self, cfg, model=None):
         self.facedetector = FaceDetector(cfg.face_detector_weights)
         self.alignface = alignFace()
         self.work_dir = "."
@@ -30,15 +31,19 @@ class VideoSwap:
         self.num_frames = 10
         self.kps_window = []
         checkpoint = (cfg.model_path, cfg.model_idx)
-        self.model = HifiFace(
-            opt.identity_extractor_config, is_training=False, device=self.device, load_checkpoint=checkpoint
-        )
+        if model is None:
+            self.model = HifiFace(
+                opt.identity_extractor_config, is_training=False, device=self.device, load_checkpoint=checkpoint
+            )
+        else:
+            self.model = model
         self.model.eval()
         os.makedirs(self.work_dir, exist_ok=True)
-        self.swapped_video = os.path.join(self.work_dir, "swapped_video.mp4")
+        uid = uuid.uuid4()
+        self.swapped_video = os.path.join(self.work_dir, f"tmp_{uid}.mp4")
 
         # model-idx_image-name_target-video-name.mp4
-        swapped_with_audio_name = "result.mp4"
+        swapped_with_audio_name = f"result_{uid}.mp4"
 
         # 带有音频的换脸视频
         self.swapped_video_with_audio = os.path.join(self.work_dir, swapped_with_audio_name)

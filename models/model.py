@@ -33,15 +33,15 @@ class HifiFace:
     ):
         super(HifiFace, self).__init__()
         self.generator = Generator(identity_extractor_config)
-        self.lr = TrainConfig().lr
-        self.use_ddp = TrainConfig().use_ddp
-        self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
-
-        self.discriminator = init_net(Discriminator(3))
-
         self.is_training = is_training
 
         if self.is_training:
+            self.lr = TrainConfig().lr
+            self.use_ddp = TrainConfig().use_ddp
+            self.grad_clip = TrainConfig().grad_clip if TrainConfig().grad_clip is not None else 100.0
+
+            self.discriminator = init_net(Discriminator(3))
+
             self.l1_loss = nn.L1Loss()
             if TrainConfig().eye_hm_loss or TrainConfig().mouth_hm_loss:
                 self.mse_loss = nn.MSELoss()
@@ -122,7 +122,9 @@ class HifiFace:
             d_path = os.path.join(path, f"discriminator_{idx}.pth")
         logger.info(f"Loading generator from {g_path}")
         self.generator.load_state_dict(torch.load(g_path, map_location="cpu"))
-        self.discriminator.load_state_dict(torch.load(d_path, map_location="cpu"))
+        if self.is_training:
+            logger.info(f"Loading discriminator from {d_path}")
+            self.discriminator.load_state_dict(torch.load(d_path, map_location="cpu"))
 
     def setup(self, device):
         self.generator.to(device)
