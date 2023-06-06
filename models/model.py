@@ -128,9 +128,9 @@ class HifiFace:
 
     def setup(self, device):
         self.generator.to(device)
-        self.discriminator.to(device)
 
         if self.is_training:
+            self.discriminator.to(device)
             self.l1_loss.to(device)
             if TrainConfig().eye_hm_loss or TrainConfig().mouth_hm_loss:
                 self.mse_loss.to(device)
