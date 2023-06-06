@@ -181,7 +181,8 @@ class HifiFace:
 
     def eval(self):
         self.generator.eval()
-        self.discriminator.eval()
+        if self.is_training:
+            self.discriminator.eval()
 
     def train_forward_generator(self, source_img, target_img, target_mask, same_id_mask):
         """
