@@ -53,9 +53,8 @@ def main():
         """
         )
         with gr.Tab("图片换脸"):
-
-            output_image = gr.Image(shape=None, label="换脸结果")
             source_image = gr.Image(shape=None, label="选脸图")
+            target_image = gr.Image(shape=None, label="目标图")
             structure_sim = gr.Slider(
                 minimum=0.0,
                 maximum=1.0,
@@ -75,16 +74,16 @@ def main():
                 fn=inference_image,
                 inputs=[
                     source_image,
-                    gr.Image(shape=None, label="目标图"),
+                    target_image,
                     structure_sim,
                     id_sim,
                 ],
-                outputs=output_image,
+                outputs=gr.Image(shape=None, label="换脸结果"),
             )
 
         with gr.Tab("视频换脸"):
             source_image = gr.Image(shape=None, label="选脸图")
-            output_video = gr.Video(value=None, label="换脸结果")
+            target_video = gr.Video(value=None, label="目标视频")
             structure_sim = gr.Slider(
                 minimum=0.0,
                 maximum=1.0,
@@ -104,11 +103,11 @@ def main():
                 fn=inference_video,
                 inputs=[
                     source_image,
-                    gr.Video(value=None, label="目标视频"),
+                    target_video,
                     structure_sim,
                     id_sim,
                 ],
-                outputs=output_video,
+                outputs=gr.Video(value=None, label="换脸结果"),
             )
 
     demo.launch(server_name="0.0.0.0", server_port=7860)
