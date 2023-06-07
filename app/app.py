@@ -52,7 +52,7 @@ def main():
         v1.0: developed by yiwise CV group
         """
         )
-        with gr.Tab("图片换脸"):
+        with gr.Tab("图片融合"):
             with gr.Row():
                 source_image = gr.Image(shape=None, label="选脸图")
                 target_image = gr.Image(shape=None, label="目标图")
@@ -72,8 +72,8 @@ def main():
                         step=0.1,
                         label="人脸特征相似度",
                     )
-                    image_btn = gr.Button("图像换脸")
-                output_image = gr.Image(shape=None, label="换脸结果")
+                    image_btn = gr.Button("图像融合")
+                output_image = gr.Image(shape=None, label="融合结果")
 
             image_btn.click(
                 fn=inference_image,
@@ -86,7 +86,7 @@ def main():
                 outputs=output_image,
             )
 
-        with gr.Tab("视频换脸"):
+        with gr.Tab("视频融合"):
             with gr.Row():
                 source_image = gr.Image(shape=None, label="选脸图")
                 target_video = gr.Video(value=None, label="目标视频")
@@ -106,8 +106,8 @@ def main():
                         step=0.1,
                         label="人脸特征相似度",
                     )
-                    video_btn = gr.Button("视频换脸")
-                output_video = gr.Video(value=None, label="换脸结果")
+                    video_btn = gr.Button("视频融合")
+                output_video = gr.Video(value=None, label="融合结果")
 
             video_btn.click(
                 fn=inference_video,
