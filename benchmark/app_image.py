@@ -72,7 +72,7 @@ class ImageSwap:
         align_img = align_img / 255.0
         return align_img, warp_mat
 
-    def inference(self, source_face, target_face, shape_rate, id_rate):
+    def inference(self, source_face, target_face, shape_rate, id_rate, iterations=1):
         src = source_face
         src, _ = self.detect_and_align(src)
         if src is None:
@@ -86,8 +86,10 @@ class ImageSwap:
         logger.info("start swapping")
         frame_size = (target.shape[0], target.shape[1])
         with torch.no_grad():
-            swapped_face, m_r = self.model.forward(src, align_target, shape_rate, id_rate)
-            swapped_face = torch.clamp(swapped_face, 0, 1)
+            for _ in range(iterations):
+                swapped_face, m_r = self.model.forward(src, align_target, shape_rate, id_rate)
+                swapped_face = torch.clamp(swapped_face, 0, 1)
+                align_target = swapped_face
             smooth_face_mask, _ = self.smooth_mask(m_r)
         warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
         inverse_warp_mat = inverse_transform_batch(warp_mat, device=self.device)
