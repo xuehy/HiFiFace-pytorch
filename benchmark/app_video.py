@@ -128,7 +128,7 @@ class VideoSwap:
             self.kps_window = []
         return align_img, warp_mat
 
-    def inference(self, source_face, target_video, shape_rate, id_rate):
+    def inference(self, source_face, target_video, shape_rate, id_rate, iterations=1):
         video = cv2.VideoCapture(target_video)
         # 获取视频宽度
         frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -188,8 +188,10 @@ class VideoSwap:
                     result_face = chunk
                 else:
                     with torch.no_grad():
-                        swapped_face, m_r = self.model.forward(src, align_img, shape_rate, id_rate)
-                        swapped_face = torch.clamp(swapped_face, 0, 1)
+                        for _ in range(iterations):
+                            swapped_face, m_r = self.model.forward(src, align_img, shape_rate, id_rate)
+                            swapped_face = torch.clamp(swapped_face, 0, 1)
+                            align_img = swapped_face
                         smooth_face_mask, _ = self.smooth_mask(m_r)
                     warp_mat = torch.from_numpy(warp_mat).float().unsqueeze(0)
                     inverse_warp_mat = inverse_transform_batch(warp_mat)

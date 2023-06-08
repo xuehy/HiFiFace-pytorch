@@ -42,8 +42,8 @@ def main():
     def inference_image(source_face, target_face, shape_rate, id_rate, iterations):
         return image_infer.inference(source_face, target_face, shape_rate, id_rate, int(iterations))
 
-    def inference_video(source_face, target_video, shape_rate, id_rate):
-        return video_infer.inference(source_face, target_video, shape_rate, id_rate)
+    def inference_video(source_face, target_video, shape_rate, id_rate, iterations):
+        return video_infer.inference(source_face, target_video, shape_rate, id_rate, int(iterations))
 
     with gr.Blocks(title="高属性一致人脸融合系统") as demo:
         gr.Markdown(
@@ -108,6 +108,13 @@ def main():
                         step=0.1,
                         label="人脸特征相似度",
                     )
+                    iters = gr.Slider(
+                        minimum=1,
+                        maximum=10,
+                        value=1,
+                        step=1,
+                        label="换脸迭代次数",
+                    )
                     video_btn = gr.Button("视频融合")
                 output_video = gr.Video(value=None, label="融合结果")
 
@@ -118,6 +125,7 @@ def main():
                     target_video,
                     structure_sim,
                     id_sim,
+                    iters,
                 ],
                 outputs=output_video,
             )
