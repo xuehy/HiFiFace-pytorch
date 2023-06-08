@@ -51,7 +51,7 @@ def main():
             f"""
         # HiConFace人脸融合系统
         v1.0: developed by yiwise CV group. <br>
-        ### model: {model_name}>
+        ### model: {model_name}
         """
         )
         with gr.Tab("图片融合"):
