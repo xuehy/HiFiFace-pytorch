@@ -40,7 +40,7 @@ def main():
     video_infer = VideoSwap(cfg, model)
 
     def inference_image(source_face, target_face, shape_rate, id_rate, iterations):
-        return image_infer.inference(source_face, target_face, shape_rate, id_rate, iterations)
+        return image_infer.inference(source_face, target_face, shape_rate, id_rate, int(iterations))
 
     def inference_video(source_face, target_video, shape_rate, id_rate):
         return video_infer.inference(source_face, target_video, shape_rate, id_rate)
@@ -77,7 +77,7 @@ def main():
                         maximum=10,
                         value=1,
                         step=1,
-                        label="人脸特征相似度",
+                        label="换脸迭代次数",
                     )
                     image_btn = gr.Button("图像融合")
                 output_image = gr.Image(shape=None, label="融合结果")
