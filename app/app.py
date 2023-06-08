@@ -45,11 +45,13 @@ def main():
     def inference_video(source_face, target_video, shape_rate, id_rate, iterations):
         return video_infer.inference(source_face, target_video, shape_rate, id_rate, int(iterations))
 
+    model_name = cfg.model_path.split("/")[-1] + ":" + f"{cfg.model_idx}"
     with gr.Blocks(title="高属性一致人脸融合系统") as demo:
         gr.Markdown(
-            """
+            f"""
         # HiConFace人脸融合系统
-        v1.0: developed by yiwise CV group
+        v1.0: developed by yiwise CV group.
+        model: {model_name}
         """
         )
         with gr.Tab("图片融合"):
