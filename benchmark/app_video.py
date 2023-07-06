@@ -149,7 +149,7 @@ class VideoSwap:
             self.encode_config = {
                 "encoder": "h264_nvenc",  # GPU Encoder
                 "encoder_format": "yuv444p",
-                "encoder_option": {"gpu": "0"},  # Run encoding on the cuda:0 device
+                "encoder_option": {"gpu": "0", "cq": "10"},  # Run encoding on the cuda:0 device
                 "hw_accel": "cuda:0",  # Data comes from cuda:0 device
                 "frame_rate": frame_rate,
                 "height": frame_height,
