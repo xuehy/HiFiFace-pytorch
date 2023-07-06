@@ -175,7 +175,8 @@ class VideoSwap:
         if self.ffmpeg_device == "cpu":
             sr.add_basic_video_stream(**self.decode_config)
         else:
-            sr.add_video_stream(**self.decode_config)
+            sr.add_basic_video_stream(**self.decode_config)
+            # sr.add_video_stream(**self.decode_config)
         sw = StreamWriter(self.swapped_video)
         sw.add_video_stream(**self.encode_config)
         with sw.open():
