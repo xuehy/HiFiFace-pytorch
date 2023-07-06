@@ -139,12 +139,13 @@ class VideoSwap:
         video.release()
         self.frame_size = (frame_height, frame_width)
         if self.ffmpeg_device == "cuda":
-            self.decode_config = {
-                "frames_per_chunk": 1,
-                "decoder": "h264_cuvid",
-                "decoder_option": {"gpu": "0"},
-                "hw_accel": "cuda:0",
-            }
+            self.decode_config = {"frames_per_chunk": 1, "decoder": "h264", "format": "yuv444p"}
+            # self.decode_config = {
+            #     "frames_per_chunk": 1,
+            #     "decoder": "h264_cuvid",
+            #     "decoder_option": {"gpu": "0"},
+            #     "hw_accel": "cuda:0",
+            # }
 
             self.encode_config = {
                 "encoder": "h264_nvenc",  # GPU Encoder
