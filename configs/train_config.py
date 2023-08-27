@@ -33,7 +33,6 @@ class TrainConfig:
         "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20_new.pth",
         "f_id_checkpoint_path": "/data/useful_ckpt/arcface/ms1mv3_arcface_r100_fp16_backbone.pth",
         "bfm_folder": "/data/useful_ckpt/BFM",
-        "model_ft_path": "/data/useful_ckpt/AWL_detector/WFLW_4HG.pth",
         "hrnet_path": "/data/useful_ckpt/face_98lmks/HR18-WFLW.pth",
     }
 
