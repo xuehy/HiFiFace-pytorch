@@ -1,5 +1,5 @@
 * An unofficial implementation of HiFiFace
-This is unofficial implementation of HiFiFace, including some modifications.
+This is an unofficial implementation of HiFiFace, including some modifications.
 ** Reference
 Wang, Yuhan, Xu Chen, Junwei Zhu, Wenqing Chu, Ying Tai, Chengjie Wang, Jilin Li, Yongjian Wu, Feiyue Huang, and Rongrong Ji. "HifiFace: 3D Shape and Semantic Prior Guided High Fidelity Face Swapping." arXiv, June 18, 2021. https://doi.org/10.48550/arXiv.2106.09965.
 ** Results
