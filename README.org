@@ -72,6 +72,10 @@ a demo based on gradio is provided: ~app/app.py~
 You need to download all auxiliary models and pretrained models, then modify the model paths in ~app/app.py~ and ~configs/train_config.py~
 *** Train
 see ~entry/train.py~
+
+*** HuggingFace Inference Demo
+We provide inference demo for image based face swap on huggingface with both models: [[https://huggingface.co/spaces/hyxue/HiFiFace-inference-demo][HiFiFace-inference-demo]]
+
 ** Modifications
 We find that the attributes of the faces such as eye gaze directions and mouth shapes cannot be well preserved after face swapping, and therefore we introduce some auxiliary losses including the eye heat map loss and the mouth heatmap loss.
 
