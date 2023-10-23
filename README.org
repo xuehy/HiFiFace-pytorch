@@ -3,11 +3,18 @@ This is an unofficial implementation of HiFiFace, including some modifications.
 ** Reference
 Wang, Yuhan, Xu Chen, Junwei Zhu, Wenqing Chu, Ying Tai, Chengjie Wang, Jilin Li, Yongjian Wu, Feiyue Huang, and Rongrong Ji. "HifiFace: 3D Shape and Semantic Prior Guided High Fidelity Face Swapping." arXiv, June 18, 2021. https://doi.org/10.48550/arXiv.2106.09965.
 ** Results
-  [[file:results/p1.png]]
-  [[file:results/p2.png]]
-  [[file:results/p3.png]]
-  [[file:results/p4.png]]
-  [[file:results/p5.png]]
+*** Standard model from the original paper
+[[file:results/exp_230901_base_1693564635742_320000_1.jpg]]
+[[file:results/p1.png]]
+[[file:results/p2.png]]
+[[file:results/p3.png]]
+[[file:results/p4.png]]
+[[file:results/p5.png]]
+
+*** Model with eye and mouth heat map loss
+to better preserve gaze and mouth shape
+[[file:/results/origan-v0-new-3d-250k-eye-mouth-hm-weight-10k-10k_1685515837755_190000_1.jpg]]
+
 ** Dependencies
 *** Models
 The project depends on multiple exterior repositories whose codes have been integrated into this repo already. You need to download corresponding model files.
