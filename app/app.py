@@ -9,7 +9,7 @@ from models.model import HifiFace
 
 
 class ConfigPath:
-    face_detector_weights = "/home/yangguo/useful_ckpt/face_detector_scrfd_10g_bnkps.onnx"
+    face_detector_weights = "/useful_ckpt/face_detector_scrfd_10g_bnkps.onnx"
     model_path = ""
     model_idx = 80000
     ffmpeg_device = "cuda"
@@ -46,18 +46,16 @@ def main():
         return video_infer.inference(source_face, target_video, shape_rate, id_rate, int(iterations))
 
     model_name = cfg.model_path.split("/")[-1] + ":" + f"{cfg.model_idx}"
-    with gr.Blocks(title="高属性一致人脸融合系统") as demo:
+    with gr.Blocks(title="FaceSwap") as demo:
         gr.Markdown(
             f"""
-        # HiConFace人脸融合系统
-        v1.0: developed by yiwise CV group. <br>
         ### model: {model_name}
         """
         )
-        with gr.Tab("图片融合"):
+        with gr.Tab("Image swap"):
             with gr.Row():
-                source_image = gr.Image(shape=None, label="选脸图")
-                target_image = gr.Image(shape=None, label="目标图")
+                source_image = gr.Image(shape=None, label="source image")
+                target_image = gr.Image(shape=None, label="target image")
             with gr.Row():
                 with gr.Column():
                     structure_sim = gr.Slider(
@@ -65,24 +63,24 @@ def main():
                         maximum=1.0,
                         value=1.0,
                         step=0.1,
-                        label="3d结构相似度（1.0表示最接近选脸图）",
+                        label="3d similarity",
                     )
                     id_sim = gr.Slider(
                         minimum=0.0,
                         maximum=1.0,
                         value=1.0,
                         step=0.1,
-                        label="人脸特征相似度",
+                        label="id similarity",
                     )
                     iters = gr.Slider(
                         minimum=1,
                         maximum=10,
                         value=1,
                         step=1,
-                        label="换脸迭代次数",
+                        label="iters",
                     )
-                    image_btn = gr.Button("图像融合")
-                output_image = gr.Image(shape=None, label="融合结果")
+                    image_btn = gr.Button("image swap")
+                output_image = gr.Image(shape=None, label="Result")
 
             image_btn.click(
                 fn=inference_image,
@@ -90,10 +88,10 @@ def main():
                 outputs=output_image,
             )
 
-        with gr.Tab("视频融合"):
+        with gr.Tab("Video swap"):
             with gr.Row():
-                source_image = gr.Image(shape=None, label="选脸图")
-                target_video = gr.Video(value=None, label="目标视频")
+                source_image = gr.Image(shape=None, label="source image")
+                target_video = gr.Video(value=None, label="target video")
             with gr.Row():
                 with gr.Column():
                     structure_sim = gr.Slider(
@@ -101,24 +99,24 @@ def main():
                         maximum=1.0,
                         value=1.0,
                         step=0.1,
-                        label="3d结构相似度（1.0表示最接近选脸图）",
+                        label="3d similarity",
                     )
                     id_sim = gr.Slider(
                         minimum=0.0,
                         maximum=1.0,
                         value=1.0,
                         step=0.1,
-                        label="人脸特征相似度",
+                        label="id similarity",
                     )
                     iters = gr.Slider(
                         minimum=1,
                         maximum=10,
                         value=1,
                         step=1,
-                        label="换脸迭代次数",
+                        label="iters",
                     )
-                    video_btn = gr.Button("视频融合")
-                output_video = gr.Video(value=None, label="融合结果")
+                    video_btn = gr.Button("video swap")
+                output_video = gr.Video(value=None, label="Result")
 
             video_btn.click(
                 fn=inference_video,

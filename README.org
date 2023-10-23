@@ -1,9 +1,81 @@
-** 启动实验方法
+* An unofficial implementation of HiFiFace
+This is unofficial implementation of HiFiFace, including some modifications.
+** Reference
+Wang, Yuhan, Xu Chen, Junwei Zhu, Wenqing Chu, Ying Tai, Chengjie Wang, Jilin Li, Yongjian Wu, Feiyue Huang, and Rongrong Ji. "HifiFace: 3D Shape and Semantic Prior Guided High Fidelity Face Swapping." arXiv, June 18, 2021. https://doi.org/10.48550/arXiv.2106.09965.
+** Results
+  [[file:results/p1.png]]
+  [[file:results/p2.png]]
+  [[file:results/p3.png]]
+  [[file:results/p4.png]]
+  [[file:results/p5.png]]
+** Dependencies
+*** Models
+The project depends on multiple exterior repositories whose codes have been integrated into this repo already. You need to download corresponding model files.
 
-*** 单卡
-1. 修改 ~configs/train_config.py~ 中的 ~use_ddp = False~
-2. ~CUDA_VISIBLE_DEVICES=x python -m entry.train~
+In ~configs/train_config.py~, modify the dict to the correct paths of your downloaded models:
+#+BEGIN_SRC python 
+identity_extractor_config = {
+        "f_3d_checkpoint_path": "/data/useful_ckpt/Deep3DFaceRecon/epoch_20_new.pth",
+        "f_id_checkpoint_path": "/data/useful_ckpt/arcface/ms1mv3_arcface_r100_fp16_backbone.pth",
+        "bfm_folder": "/data/useful_ckpt/BFM",
+        "hrnet_path": "/data/useful_ckpt/face_98lmks/HR18-WFLW.pth",
+    }
+#+END_SRC
 
-*** 多卡
-1. 修改 ~configs/train_config.py~ 中的 ~use_ddp = True~
-2. 以两卡为例: ~CUDA_VISIBLE_DEVICES=x1,x2 torchrun --nnodes=1 --nproc_per_node=2 --rdzv_id=100 --rdzv_backend=c10d --rdzv_endpoint=127.0.0.1:29400 -m entry.train~
+Download urls:
+- Deep3DFaceRecon: https://github.com/sicxu/Deep3DFaceRecon_pytorch#04252023-update
+- Arcface: https://1drv.ms/u/s!AswpsDO2toNKq0lWY69vN58GR6mw?e=p9Ov5d
+- BFM: you can acquire the bfm data from https://faces.dmi.unibas.ch/bfm/main.php?nav=1-2&id=downloads
+  the dir structure of the BFM should be like:
+  #+BEGIN_SRC bash
+    BFM
+    +-- [230M]  01_MorphableModel.mat
+    +-- [ 90K]  BFM_exp_idx.mat
+    +-- [ 44K]  BFM_front_idx.mat
+    +-- [121M]  BFM_model_front.mat
+    +-- [ 49M]  Exp_Pca.bin
+    +-- [ 428]  Exp_Pca.bin?Zone.Identifier
+    +-- [722K]  facemodel_info.mat
+    +-- [ 61K]  select_vertex_id.mat
+    +-- [ 994]  similarity_Lm3D_all.mat
+    +-- [ 615]  std_exp.txt
+#+END_SRC
+- scrfd: face detection model (for inference). Download from [[https://1drv.ms/f/s!AvTUwUcr9zMi3DwJr3iTLumYCMrW?e=lkVAUr][here]].
+- hrnet(optional): if you want to enable the gaze and mouth shape losses.
+*** Environments
+- PyTorch >= 2.0
+- torchaudio with cuda support
+- ffmpeg
+- gradio
+- etc.
+
+You can also use the pre-built docker image: ~docker pull xuehy93/hififace~
+** Datasets
+We use a mixed dataset from VGGFace2 HQ, Asia-celeb and some other data collected by ourselves. If you want to train your own model, you may download VGGFace2 HQ and Asia-celeb datasets.
+- VGGFace2 HQ: https://github.com/NNNNAI/VGGFace2-HQ
+- Asia-Celeb: http://trillionpairs.deepglint.com/data , download the ~train_celebrity.tar.gz~
+** Pretrained models
+We provide two pretrained models [[https://1drv.ms/f/s!AvTUwUcr9zMi3DwJr3iTLumYCMrW?e=lkVAUr][here]] , one is trained without gaze and mouth shape loss and the other is trained with attributes loss:
+1. standard_model
+2. with_gaze_and_mouth
+** Usage
+*** Inference
+a demo based on gradio is provided: ~app/app.py~
+
+You need to download all auxiliary models and pretrained models, then modify the model paths in ~app/app.py~ and ~configs/train_config.py~
+*** Train
+see ~entry/train.py~
+** Modifications
+We find that the attributes of the faces such as eye gaze directions and mouth shapes cannot be well preserved after face swapping, and therefore we introduce some auxiliary losses including the eye heat map loss and the mouth heatmap loss.
+
+You can enable them or disable them by setting
+~eye_hm_loss~ and ~mouth_hm_loss~ in ~configs/train_config.py~
+
+** Acknowledgements
+1. The official repo https://github.com/johannwyh/HifiFace although they provide no codes, the disccusions in the issues are helpful.
+** Problems
+Currently our implementation is not perfect:
+1. The attributes such as gaze and mouth shapes cannot be well preserved with the original model proposed in the paper. This problem is obvious in video face swapping results.
+2. With the eye and mouth heat map losses, the attributes are better preserved, however, the face swap similarity drops significantly.
+   
+Any dicussions and feedbacks are welcome!!!
